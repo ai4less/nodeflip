@@ -1,0 +1,36 @@
+{
+  "name": "nodeflip",
+  "displayName": "nodeflip",
+  "version": "0.0.0",
+  "author": "ai4less",
+  "description": "",
+  "type": "module",
+  "license": "AGPL-3.0",
+  "keywords": [
+    "chrome-extension",
+    "preact",
+    "vite",
+    "create-chrome-ext"
+  ],
+  "engines": {
+    "node": ">=14.18.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fmt": "prettier --write '**/*.{jsx,js,json,css,scss,md}'",
+    "zip": "npm run build && node src/zip.js"
+  },
+  "dependencies": {
+    "preact": "^10.18.1"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.26",
+    "@preact/preset-vite": "^2.6.0",
+    "gulp": "^5.0.0",
+    "gulp-zip": "^6.0.0",
+    "prettier": "^3.0.3",
+    "vite": "^5.4.10"
+  }
+}
