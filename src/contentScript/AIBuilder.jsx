@@ -101,28 +101,100 @@ export const AIBuilder = () => {
       
       setMessages(prev => [...prev, assistantMessage])
       
+      // n8n-style streaming with custom delimiter
+      const N8N_DELIMITER = '⧉⇋⇋➽⌑⧉§§'
+      let buffer = ''
+      
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         
-        const chunk = decoder.decode(value)
-        const lines = chunk.split('\n')
+        buffer += decoder.decode(value, { stream: true })
         
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              if (data.content) {
-                assistantMessage.content += data.content
+        // Split by n8n delimiter
+        const messageParts = buffer.split(N8N_DELIMITER)
+        buffer = messageParts.pop() || '' // Keep incomplete message in buffer
+        
+        for (const part of messageParts) {
+          if (!part.trim()) continue
+          
+          try {
+            const parsed = JSON.parse(part)
+            const messages = parsed.messages || []
+            
+            for (const msg of messages) {
+              if (msg.type === 'message' && msg.text) {
+                // Regular text message
+                assistantMessage.content += msg.text
+                setMessages(prev => {
+                  const newMessages = [...prev]
+                  newMessages[newMessages.length - 1] = { ...assistantMessage }
+                  return newMessages
+                })
+              } else if (msg.type === 'node_suggestion' && msg.data) {
+                // Node suggestion - add node to workflow automatically via page context
+                if (msg.data.node) {
+                  try {
+                    console.log('[nodeFlip] Received node suggestion:', msg.data.node)
+                    console.log('[nodeFlip] Node parameters:', JSON.stringify(msg.data.node.parameters, null, 2))
+                    
+                    // Send message to page context to add node
+                    const addNodePromise = new Promise((resolve, reject) => {
+                      const messageId = `add-node-${Date.now()}`
+                      
+                      const handleResponse = (event) => {
+                        if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
+                          window.removeEventListener('message', handleResponse)
+                          if (event.data.success) {
+                            resolve(event.data.result)
+                          } else {
+                            reject(new Error(event.data.error || 'Failed to add node'))
+                          }
+                        }
+                      }
+                      
+                      window.addEventListener('message', handleResponse)
+                      
+                      // Send request to page context - use JSON to ensure cloneable
+                      window.postMessage({
+                        type: 'n8nStore-addNode',
+                        messageId: messageId,
+                        nodeConfig: JSON.parse(JSON.stringify(msg.data.node))
+                      }, '*')
+                      
+                      // Timeout after 5 seconds
+                      setTimeout(() => {
+                        window.removeEventListener('message', handleResponse)
+                        reject(new Error('Timeout waiting for node addition'))
+                      }, 5000)
+                    })
+                    
+                    await addNodePromise
+                    console.log('[nodeFlip] Node added successfully')
+                    
+                    // Show success message
+                    const successMsg = msg.data.chat_message || 
+                      `Added ${msg.data.node.name} to workflow`
+                    assistantMessage.content += successMsg
+                  } catch (error) {
+                    console.error('[nodeFlip] Failed to add node:', error)
+                    assistantMessage.content += `\n\n⚠️ Failed to add node: ${error.message}`
+                  }
+                } else if (msg.data.chat_message) {
+                  // Just a chat message without node
+                  assistantMessage.content += msg.data.chat_message
+                }
+                
                 setMessages(prev => {
                   const newMessages = [...prev]
                   newMessages[newMessages.length - 1] = { ...assistantMessage }
                   return newMessages
                 })
               }
-            } catch (parseError) {
-              console.warn('[nodeFlip] Failed to parse chunk:', parseError)
+              // Ignore tool messages for now - they're just progress indicators
             }
+          } catch (parseError) {
+            console.warn('[nodeFlip] Failed to parse n8n message:', parseError, part)
           }
         }
       }

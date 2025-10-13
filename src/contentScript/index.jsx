@@ -48,6 +48,25 @@ function isWorkflowPage() {
 }
 
 /**
+ * Inject n8nStore script into page context
+ */
+function injectN8NStoreScript() {
+  // Inject the n8nStore.js script into the page context
+  // This is needed because content scripts can't access the page's Vue app
+  const script = document.createElement('script')
+  script.src = chrome.runtime.getURL('src/contentScript/n8nStore.js')
+  script.type = 'module'
+  script.onload = () => {
+    console.log('[nodeFlip] n8nStore script injected into page context')
+    script.remove()
+  }
+  script.onerror = (error) => {
+    console.error('[nodeFlip] Failed to load n8nStore script:', error)
+  }
+  ;(document.head || document.documentElement).appendChild(script)
+}
+
+/**
  * Inject AI Builder sidebar
  */
 async function injectAIBuilder() {
@@ -57,6 +76,9 @@ async function injectAIBuilder() {
   }
 
   try {
+    // Inject n8nStore into page context first
+    injectN8NStoreScript()
+    
     // Wait for n8n app to be ready
     await waitForElement('#n8n-app')
     console.log('[nodeFlip] n8n app found, injecting AI Builder')

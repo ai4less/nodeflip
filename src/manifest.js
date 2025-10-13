@@ -35,8 +35,8 @@ export default defineManifest({
   },
   web_accessible_resources: [
     {
-      resources: ['img/logo-16.png', 'img/logo-32.png', 'img/logo-48.png', 'img/logo-128.png'],
-      matches: [],
+      resources: ['img/logo-16.png', 'img/logo-32.png', 'img/logo-48.png', 'img/logo-128.png', 'src/contentScript/n8nStore.js'],
+      matches: ['http://*/*', 'https://*/*'],
     },
   ],
   permissions: ['sidePanel', 'storage'],
