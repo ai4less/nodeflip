@@ -25,8 +25,11 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
   const [value, setValue] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [height, setHeight] = useState(60)
+  const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef(null)
   const commandMenuRef = useRef(null)
+  const containerRef = useRef(null)
 
   const {
     isMenuOpen,
@@ -39,14 +42,35 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
     closeMenu,
   } = useCommandPalette(COMMANDS)
 
-  // Auto-resize textarea
+  // Handle resize dragging
   useEffect(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return
+    const handleMouseMove = e => {
+      if (!isDragging || !containerRef.current) return
 
-    textarea.style.height = 'auto'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
-  }, [value])
+      const container = containerRef.current
+      const rect = container.getBoundingClientRect()
+      const newHeight = Math.max(60, Math.min(400, rect.bottom - e.clientY))
+      setHeight(newHeight)
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'ns-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isDragging])
 
   const executeCommand = useCallback(
     command => {
@@ -126,15 +150,30 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
   const styles = {
     wrapper: {
       background: 'var(--color-background-xlight, #ffffff)',
-      borderTop: 'var(--border-base, 1px solid #e0e0e0)',
+      position: 'relative',
+      height: `${height}px`,
+      minHeight: '60px',
+      maxHeight: '400px',
+    },
+    resizeHandle: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: '4px',
+      cursor: 'ns-resize',
+      background: isDragging ? 'rgba(151, 51, 238, 0.15)' : 'transparent',
+      transition: 'background 0.2s',
+      zIndex: 10,
     },
     container: {
       padding: '12px 16px',
       display: 'flex',
       gap: '10px',
       alignItems: 'flex-end',
-      minHeight: '60px',
+      height: '100%',
       position: 'relative',
+      overflow: 'auto',
     },
     creditsBar: {
       padding: '8px 16px',
@@ -171,8 +210,8 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
       fontFamily: 'inherit',
       resize: 'none',
       outline: 'none',
+      height: '100%',
       minHeight: '42px',
-      maxHeight: '120px',
       lineHeight: 1.5,
       color: 'var(--color-text-dark, #333)',
       background: 'var(--color-background-xlight, #fff)',
@@ -207,7 +246,22 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
   }
 
   return (
-    <div style={styles.wrapper}>
+    <div style={styles.wrapper} ref={containerRef}>
+      <div
+        style={styles.resizeHandle}
+        onMouseDown={() => setIsDragging(true)}
+        onMouseEnter={e => {
+          if (!isDragging) {
+            e.currentTarget.style.background = 'rgba(124, 58, 237, 0.1)'
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isDragging) {
+            e.currentTarget.style.background = 'transparent'
+          }
+        }}
+        title="Drag to resize"
+      />
       <div style={styles.container}>
         {isMenuOpen && filteredCommands.length > 0 && (
           <CommandMenu
