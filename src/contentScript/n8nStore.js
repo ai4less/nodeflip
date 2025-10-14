@@ -23,7 +23,6 @@ export function getWorkflowsStore() {
     }
     
     const symbols = Object.getOwnPropertySymbols(provides);
-    console.log('[n8nStore] Found', symbols.length, 'symbols in provides');
     
     const pinia = symbols
       .map(s => provides[s])
@@ -34,15 +33,12 @@ export function getWorkflowsStore() {
       return null;
     }
     
-    console.log('[n8nStore] Pinia stores available:', Array.from(pinia._s.keys()));
-    
     const workflowsStore = pinia._s.get("workflows");
     if (!workflowsStore) {
       console.warn('[n8nStore] Workflows store not found in Pinia');
       return null;
     }
     
-    console.log('[n8nStore] Successfully accessed workflows store');
     return workflowsStore;
   } catch (error) {
     console.error('[n8nStore] Failed to get workflows store:', error);
@@ -129,7 +125,7 @@ function applyDefaultParameters(nodeConfig, nodeTypeDef) {
  * @param {Array} nodeConfig.position - [x, y] position on canvas
  * @returns {Promise<Object>} Added node or null on failure
  */
-export async function addNodeToWorkflow(nodeConfig) {
+export async function addNodeToWorkflow(nodeConfig, options = {}) {
   try {
     // Try to get workflows store with retries
     let workflowsStore = getWorkflowsStore();
@@ -137,7 +133,6 @@ export async function addNodeToWorkflow(nodeConfig) {
     const maxRetries = 3;
     
     while (!workflowsStore && retries < maxRetries) {
-      console.log(`[n8nStore] Retry ${retries + 1}/${maxRetries} - waiting for workflows store...`);
       await new Promise(resolve => setTimeout(resolve, 500));
       workflowsStore = getWorkflowsStore();
       retries++;
@@ -180,11 +175,51 @@ export async function addNodeToWorkflow(nodeConfig) {
           nodeConfig.parameters = applyDefaultParameters(nodeConfig, nodeTypeDef);
         }
       }
-    } else {
-      console.log('[n8nStore] Using provided parameters, skipping defaults');
     }
     
-    // Add position with offset if missing
+    const { previousNodeName } = options;
+
+    if (previousNodeName) {
+      try {
+        const previousNode = typeof workflowsStore.getNodeByName === 'function'
+          ? workflowsStore.getNodeByName(previousNodeName)
+          : workflowsStore.workflow?.nodes?.find(n => n.name === previousNodeName);
+
+        if (previousNode && Array.isArray(previousNode.position) && previousNode.position.length === 2) {
+          const xSpacing = 320;
+          const ySpacing = 120;
+          const targetX = previousNode.position[0] + xSpacing;
+
+          const connections = workflowsStore.workflow?.connections || {};
+          
+          const previousNodeConnections = connections[previousNodeName];
+          
+          let siblingCount = 0;
+
+          if (previousNodeConnections) {
+            // Count existing downstream nodes from this previous node
+            Object.values(previousNodeConnections).forEach((outputIndices) => {
+              if (!outputIndices) return;
+              Object.values(outputIndices).forEach((connectionList) => {
+                if (Array.isArray(connectionList)) {
+                  siblingCount += connectionList.length;
+                }
+              });
+            });
+          }
+
+          const targetY = previousNode.position[1] + siblingCount * ySpacing;
+          const calculatedPosition = [targetX, targetY];
+          
+          nodeConfig.position = calculatedPosition;
+        } else {
+          console.warn('[n8nStore] Position calculation - previousNode not found or invalid position');
+        }
+      } catch (positionError) {
+        console.warn('[n8nStore] Failed to derive position from previous node:', positionError);
+      }
+    }
+
     if (!nodeConfig.position || !Array.isArray(nodeConfig.position) || nodeConfig.position.length !== 2) {
       if (typeof window !== 'undefined') {
         if (!window.n8nChatPositionOffsetCounter) {
@@ -202,8 +237,6 @@ export async function addNodeToWorkflow(nodeConfig) {
       nodeConfig.parameters = {};
     }
     
-    console.log('[n8nStore] Adding node:', nodeConfig.name, nodeConfig.type);
-    
     // Add node to store
     workflowsStore.addNode(nodeConfig);
     
@@ -211,8 +244,6 @@ export async function addNodeToWorkflow(nodeConfig) {
     const addedNode = workflowsStore.workflow.nodes.find(n => n.id === nodeConfig.id);
     
     if (addedNode) {
-      console.log('[n8nStore] Node added successfully:', addedNode.name);
-      
       // Trigger reactivity to update UI
       workflowsStore.setNodes([...workflowsStore.workflow.nodes]);
       
@@ -275,8 +306,6 @@ export function addConnection(
         { node: targetNodeName, type: targetInputType, index: targetInputIndex }
       ]
     };
-    
-    console.log('[n8nStore] Adding connection:', sourceNodeName, '->', targetNodeName);
     workflowsStore.addConnection(connection);
     
     return true;
@@ -306,32 +335,7 @@ export function getCurrentWorkflow() {
   }
 }
 
-// Expose utilities on window for debugging
 if (typeof window !== 'undefined') {
-  window.n8nChatNodeOps = {
-    getWorkflowsStore,
-    getNodeTypesStore,
-    addNodeToWorkflow,
-    addConnection,
-    getCurrentWorkflow,
-    // Debug helpers
-    testAccess: () => {
-      console.log('[n8nStore] Testing access...');
-      console.log('Page URL:', window.location.href);
-      console.log('App element:', document.getElementById('app'));
-      const store = getWorkflowsStore();
-      if (store) {
-        console.log('✅ Store accessible!');
-        console.log('Current workflow:', store.workflow);
-        return true;
-      } else {
-        console.log('❌ Store not accessible');
-        return false;
-      }
-    }
-  };
-  
-  // Listen for messages from content script
   window.addEventListener('message', async (event) => {
     // Only accept messages from same origin
     if (event.source !== window) return;
@@ -339,11 +343,10 @@ if (typeof window !== 'undefined') {
     const message = event.data;
     
     if (message.type === 'n8nStore-addNode') {
-      console.log('[n8nStore] Received addNode request:', message.nodeConfig);
-      console.log('[n8nStore] Node parameters received:', JSON.stringify(message.nodeConfig.parameters, null, 2));
-      
       try {
-        const result = await addNodeToWorkflow(message.nodeConfig);
+        const result = await addNodeToWorkflow(message.nodeConfig, {
+          previousNodeName: message.previousNodeName
+        });
         
         // Only send serializable data back (not the full Vue node object)
         // Use JSON parse/stringify to ensure deep clone and remove any Vue reactivity
@@ -372,8 +375,6 @@ if (typeof window !== 'undefined') {
     }
     
     if (message.type === 'n8nStore-updateNode') {
-      console.log('[n8nStore] Received updateNode request:', message.nodeName, message.parameters);
-      
       try {
         const workflowsStore = getWorkflowsStore();
         if (!workflowsStore) {
@@ -386,9 +387,6 @@ if (typeof window !== 'undefined') {
           throw new Error(`Node not found: ${message.nodeName}`);
         }
         
-        console.log('[n8nStore] Current node parameters:', JSON.stringify(node.parameters, null, 2));
-        console.log('[n8nStore] Updating with:', JSON.stringify(message.parameters, null, 2));
-        
         // Merge parameters (deep merge)
         const updatedParameters = { ...node.parameters, ...message.parameters };
         
@@ -399,10 +397,6 @@ if (typeof window !== 'undefined') {
             parameters: updatedParameters
           }
         });
-        
-        console.log('[n8nStore] Node updated successfully');
-        console.log('[n8nStore] New parameters:', JSON.stringify(updatedParameters, null, 2));
-        
         window.postMessage({
           type: 'n8nStore-response',
           messageId: message.messageId,
@@ -506,9 +500,4 @@ if (typeof window !== 'undefined') {
     }
   })
   
-  // Auto-test on load
-  setTimeout(() => {
-    console.log('[n8nStore] Running auto-test...');
-    window.n8nChatNodeOps.testAccess();
-  }, 2000);
 }
