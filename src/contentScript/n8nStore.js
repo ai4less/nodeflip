@@ -370,6 +370,55 @@ if (typeof window !== 'undefined') {
         }, '*');
       }
     }
+    
+    if (message.type === 'n8nStore-updateNode') {
+      console.log('[n8nStore] Received updateNode request:', message.nodeName, message.parameters);
+      
+      try {
+        const workflowsStore = getWorkflowsStore();
+        if (!workflowsStore) {
+          throw new Error('Workflows store not available');
+        }
+        
+        // Find the node by name
+        const node = workflowsStore.getNodeByName(message.nodeName);
+        if (!node) {
+          throw new Error(`Node not found: ${message.nodeName}`);
+        }
+        
+        console.log('[n8nStore] Current node parameters:', JSON.stringify(node.parameters, null, 2));
+        console.log('[n8nStore] Updating with:', JSON.stringify(message.parameters, null, 2));
+        
+        // Merge parameters (deep merge)
+        const updatedParameters = { ...node.parameters, ...message.parameters };
+        
+        // Update the node
+        workflowsStore.updateNodeProperties({
+          name: message.nodeName,
+          properties: {
+            parameters: updatedParameters
+          }
+        });
+        
+        console.log('[n8nStore] Node updated successfully');
+        console.log('[n8nStore] New parameters:', JSON.stringify(updatedParameters, null, 2));
+        
+        window.postMessage({
+          type: 'n8nStore-response',
+          messageId: message.messageId,
+          success: true,
+          result: { nodeName: message.nodeName, parameters: updatedParameters }
+        }, '*');
+      } catch (error) {
+        console.error('[n8nStore] Failed to update node:', error);
+        window.postMessage({
+          type: 'n8nStore-response',
+          messageId: message.messageId,
+          success: false,
+          error: error.message
+        }, '*');
+      }
+    }
   });
   
   // Listen for catalog extraction requests
@@ -380,115 +429,17 @@ if (typeof window !== 'undefined') {
       console.log('[n8nStore] Received catalog extraction request:', event.data.catalogType)
       
       try {
-        // Since we're in page context, we need to define extraction inline
-        // Import the helper functions we need
+        // Import catalog extractor functions
+        const { extractNodeCatalog, extractStandardNodes, extractCustomNodes } = await import('./catalogExtractor.js')
         
-        function isCustomNode(nodeType) {
-          const builtInPrefixes = ['n8n-nodes-base.', '@n8n/n8n-nodes-langchain.']
-          return !builtInPrefixes.some(prefix => nodeType.startsWith(prefix))
-        }
-        
-        function getCategory(groups) {
-          if (!groups) return 'Other'
-          if (Array.isArray(groups) && groups.length > 0) return groups[0]
-          return 'Other'
-        }
-        
-        function extractParameters(properties) {
-          if (!Array.isArray(properties)) return []
-          
-          return properties.map(prop => {
-            const param = {
-              displayName: prop.displayName,
-              name: prop.name,
-              type: prop.type,
-              required: prop.required || false,
-              default: prop.default,
-              description: prop.description || '',
-              placeholder: prop.placeholder
-            }
-            
-            Object.keys(param).forEach(key => {
-              if (param[key] === undefined) delete param[key]
-            })
-            
-            if (prop.options && Array.isArray(prop.options)) {
-              const hasNestedValues = prop.options.some(opt => opt.values)
-              
-              if (hasNestedValues) {
-                param.options = prop.options.map(opt => ({
-                  name: opt.name,
-                  displayName: opt.displayName,
-                  values: extractParameters(opt.values || [])
-                }))
-              } else {
-                param.options = prop.options.map(opt => ({
-                  name: opt.name,
-                  value: opt.value,
-                  description: opt.description
-                })).filter(opt => opt.name || opt.value)
-              }
-            }
-            
-            if (prop.typeOptions) {
-              param.typeOptions = {}
-              const validKeys = ['minValue', 'maxValue', 'numberPrecision', 'maxLength', 'password', 'multipleValues', 'rows']
-              validKeys.forEach(key => {
-                if (prop.typeOptions[key] !== undefined) {
-                  param.typeOptions[key] = prop.typeOptions[key]
-                }
-              })
-              if (Object.keys(param.typeOptions).length === 0) delete param.typeOptions
-            }
-            
-            if (prop.displayOptions) {
-              param.displayOptions = {}
-              if (prop.displayOptions.show) param.displayOptions.show = prop.displayOptions.show
-              if (prop.displayOptions.hide) param.displayOptions.hide = prop.displayOptions.hide
-              if (Object.keys(param.displayOptions).length === 0) delete param.displayOptions
-            }
-            
-            return param
-          })
-        }
-        
-        // Get node types store and extract catalog
-        const nodeTypesStore = window.n8nChatNodeOps.getNodeTypesStore()
-        
-        if (!nodeTypesStore) {
-          throw new Error('Node types store not available')
-        }
-        
-        let allNodeTypes = nodeTypesStore.allNodeTypes || 
-                           nodeTypesStore.allLatestNodeTypes || 
-                           nodeTypesStore.nodeTypes ||
-                           []
-        
-        if (typeof allNodeTypes === 'function') {
-          allNodeTypes = allNodeTypes()
-        }
-        
-        if (!allNodeTypes || allNodeTypes.length === 0) {
-          throw new Error('No node types found in store')
-        }
-        
-        console.log(`[n8nStore] Found ${allNodeTypes.length} node types`)
-        
-        const fullCatalog = allNodeTypes.map(nodeType => ({
-          type: nodeType.name,
-          name: nodeType.displayName || nodeType.name,
-          description: nodeType.description || '',
-          category: getCategory(nodeType.group),
-          isCustom: isCustomNode(nodeType.name),
-          version: nodeType.version || 1,
-          parameters: extractParameters(nodeType.properties || [])
-        }))
-        
+        // Extract catalog
         let catalog = []
         if (event.data.catalogType === 'standard') {
-          catalog = fullCatalog.filter(n => !n.isCustom)
+          catalog = extractStandardNodes()
         } else if (event.data.catalogType === 'custom') {
-          catalog = fullCatalog.filter(n => n.isCustom)
+          catalog = extractCustomNodes()
+        } else {
+          catalog = extractNodeCatalog()
         }
         
         console.log(`[n8nStore] Extracted ${catalog.length} ${event.data.catalogType} nodes`)

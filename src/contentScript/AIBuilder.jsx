@@ -18,6 +18,7 @@ export const AIBuilder = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState(null)
+  const [pendingApproval, setPendingApproval] = useState(null) // Track nodes awaiting approval
   const apiRef = useRef(new AIBuilderAPI())
   const messagesEndRef = useRef(null)
 
@@ -231,6 +232,15 @@ export const AIBuilder = () => {
     }
   }
 
+  const handleApproval = async (approved, customMessage = null) => {
+    // Clear pending approval state
+    setPendingApproval(null)
+    
+    // Send approval/rejection message
+    const message = customMessage || (approved ? 'yes' : 'no')
+    await handleSendMessage(message)
+  }
+
   const handleSendMessage = async (text) => {
     if (!chatId || isSending) return
     
@@ -359,6 +369,12 @@ export const AIBuilder = () => {
                     await addNodePromise
                     console.log('[nodeFlip] Node added successfully')
                     
+                    // Set pending approval state
+                    setPendingApproval({
+                      nodeName: msg.data.node.name,
+                      nodeType: msg.data.node.type
+                    })
+                    
                     // Show success message
                     const successMsg = msg.data.chat_message || 
                       `Added ${msg.data.node.name} to workflow`
@@ -377,6 +393,49 @@ export const AIBuilder = () => {
                   newMessages[newMessages.length - 1] = { ...assistantMessage }
                   return newMessages
                 })
+              } else if (msg.type === 'node_update' && msg.data) {
+                // Node update - update existing node parameters on canvas
+                console.log('[nodeFlip] Received node update:', msg.data.nodeName, msg.data.parameters)
+                
+                try {
+                  // Send message to page context to update node
+                  const updateNodePromise = new Promise((resolve, reject) => {
+                    const messageId = `update-node-${Date.now()}`
+                    
+                    const handleResponse = (event) => {
+                      if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
+                        window.removeEventListener('message', handleResponse)
+                        if (event.data.success) {
+                          resolve(event.data.result)
+                        } else {
+                          reject(new Error(event.data.error || 'Failed to update node'))
+                        }
+                      }
+                    }
+                    
+                    window.addEventListener('message', handleResponse)
+                    
+                    // Send update request to page context
+                    window.postMessage({
+                      type: 'n8nStore-updateNode',
+                      messageId: messageId,
+                      nodeName: msg.data.nodeName,
+                      parameters: msg.data.parameters
+                    }, '*')
+                    
+                    // Timeout after 5 seconds
+                    setTimeout(() => {
+                      window.removeEventListener('message', handleResponse)
+                      reject(new Error('Timeout waiting for node update'))
+                    }, 5000)
+                  })
+                  
+                  await updateNodePromise
+                  console.log('[nodeFlip] Node updated successfully')
+                } catch (error) {
+                  console.error('[nodeFlip] Failed to update node:', error)
+                  assistantMessage.content += `\n\n⚠️ Failed to update node: ${error.message}`
+                }
               }
               // Ignore tool messages for now - they're just progress indicators
             }
@@ -547,7 +606,54 @@ export const AIBuilder = () => {
       cursor: 'pointer',
       fontSize: '14px',
       fontWeight: 600,
-    }
+    },
+    approvalContainer: {
+      padding: '16px 20px',
+      background: 'var(--color-background-base, #f8f8f8)',
+      borderTop: '1px solid var(--color-foreground-base, #e5e7eb)',
+      borderBottom: '1px solid var(--color-foreground-base, #e5e7eb)',
+    },
+    approvalHeader: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginBottom: '12px',
+      fontSize: '14px',
+      color: 'var(--color-text-dark, #333)',
+    },
+    approvalIcon: {
+      fontSize: '18px',
+      color: '#22c55e',
+    },
+    approvalText: {
+      flex: 1,
+    },
+    approvalButtons: {
+      display: 'flex',
+      gap: '12px',
+    },
+    approvalButton: {
+      flex: 1,
+      padding: '12px 16px',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: 600,
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+    },
+    approveButton: {
+      background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+      color: '#fff',
+    },
+    rejectButton: {
+      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      color: '#fff',
+    },
   }
 
   const aiIcon = (
@@ -619,10 +725,45 @@ export const AIBuilder = () => {
         )}
       </div>
 
+      {/* Approval buttons - show when node is awaiting approval */}
+      {pendingApproval && !isSending && (
+        <div style={styles.approvalContainer}>
+          <div style={styles.approvalHeader}>
+            <span style={styles.approvalIcon}>✓</span>
+            <span style={styles.approvalText}>
+              Node added: <strong>{pendingApproval.nodeName}</strong>
+            </span>
+          </div>
+          <div style={styles.approvalButtons}>
+            <button
+              onClick={() => handleApproval(true)}
+              style={{...styles.approvalButton, ...styles.approveButton}}
+              onMouseEnter={(e) => e.target.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)'}
+              onMouseLeave={(e) => e.target.style.background = 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)'}
+            >
+              ✓ Approve
+            </button>
+            <button
+              onClick={() => {
+                const feedback = prompt("What would you like to change?")
+                if (feedback) {
+                  handleApproval(false, `no, ${feedback}`)
+                }
+              }}
+              style={{...styles.approvalButton, ...styles.rejectButton}}
+              onMouseEnter={(e) => e.target.style.background = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)'}
+              onMouseLeave={(e) => e.target.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'}
+            >
+              ✗ Request Changes
+            </button>
+          </div>
+        </div>
+      )}
+
       <ChatInput 
         onSend={handleSendMessage}
         onCommand={handleCommand}
-        disabled={isSending || !chatId || !!error} 
+        disabled={isSending || !chatId || !!error || !!pendingApproval} 
       />
     </div>
   )

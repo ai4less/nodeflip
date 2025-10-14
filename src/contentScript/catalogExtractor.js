@@ -123,15 +123,52 @@ export function extractNodeCatalog() {
       return []
     }
     
-    return allNodeTypes.map(nodeType => ({
-      type: nodeType.name,
-      name: nodeType.displayName || nodeType.name,
-      description: nodeType.description || '',
-      category: getCategory(nodeType.group),
-      isCustom: isCustomNode(nodeType.name),
-      version: nodeType.version || 1,
-      parameters: extractParameters(nodeType.properties || [])
-    }))
+    // Debug: Search for email-related nodes
+    const emailNodes = allNodeTypes.filter(n => n.name && n.name.toLowerCase().includes('email'))
+    console.log('[Catalog] Found email-related nodes:', emailNodes.map(n => n.name))
+    
+    const emailSendNode = allNodeTypes.find(n => n.name === 'n8n-nodes-base.emailSend')
+    console.log('[Catalog] emailSend (exact match) exists:', !!emailSendNode)
+    if (emailSendNode) {
+      console.log('[Catalog] emailSend properties count:', emailSendNode.properties?.length)
+      console.log('[Catalog] emailSend properties sample:', emailSendNode.properties?.slice(0, 5).map(p => p.name))
+    }
+    
+    return allNodeTypes.map(nodeType => {
+      // Debug: Log emailSend node structure during sync
+      if (nodeType.name === 'n8n-nodes-base.emailSend') {
+        console.log('========================================')
+        console.log('[SYNC] emailSend Node Structure:')
+        console.log('========================================')
+        console.log('Raw nodeType.properties:', nodeType.properties)
+        console.log('Properties count:', nodeType.properties?.length)
+        
+        const extracted = extractParameters(nodeType.properties || [])
+        console.log('Extracted parameters count:', extracted.length)
+        console.log('Extracted parameter names:', extracted.map(p => p.name))
+        
+        const hasOperation = extracted.some(p => p.name === 'operation')
+        const hasResource = extracted.some(p => p.name === 'resource')
+        console.log('Has operation field:', hasOperation)
+        console.log('Has resource field:', hasResource)
+        
+        if (hasOperation) {
+          const opField = extracted.find(p => p.name === 'operation')
+          console.log('Operation field:', opField)
+        }
+        console.log('========================================')
+      }
+      
+      return {
+        type: nodeType.name,
+        name: nodeType.displayName || nodeType.name,
+        description: nodeType.description || '',
+        category: getCategory(nodeType.group),
+        isCustom: isCustomNode(nodeType.name),
+        version: nodeType.version || 1,
+        parameters: extractParameters(nodeType.properties || [])
+      }
+    })
   } catch (error) {
     console.error('[Catalog Extractor] Error:', error)
     return []
