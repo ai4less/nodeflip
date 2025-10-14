@@ -1,43 +1,61 @@
 /**
  * Chat Message Component
- * Displays a single message in the chat
+ * Displays a single message in the chat (matches n8n styling)
  */
 
 export const ChatMessage = ({ message }) => {
   const isUser = message.role === 'user'
   const isError = message.role === 'error'
   
+  // Get user initials for avatar
+  const getInitials = () => {
+    // Try to get from user data, fallback to default
+    return 'You'.substring(0, 2).toUpperCase()
+  }
+  
   const styles = {
     container: {
       display: 'flex',
       flexDirection: 'column',
-      alignItems: isUser ? 'flex-end' : 'flex-start',
-      gap: '4px',
+      gap: '8px',
       animation: 'slideIn 0.3s ease-out',
+    },
+    header: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '13px',
+      fontWeight: 600,
+      color: 'var(--color-text-base, #666)',
+    },
+    avatar: {
+      width: '20px',
+      height: '20px',
+      borderRadius: '50%',
+      background: 'linear-gradient(135deg, #4299e1 0%, #3182ce 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontSize: '10px',
+      fontWeight: 600,
+      flexShrink: 0,
     },
     bubble: {
       padding: '12px 16px',
-      borderRadius: '16px',
+      borderRadius: '8px',
       maxWidth: '85%',
-      background: isUser 
-        ? 'linear-gradient(135deg, #9733EE 0%, #DA22FF 100%)'
-        : isError
-          ? '#fee'
-          : 'var(--color-background-base, #f0f0f0)',
-      color: isUser 
-        ? '#ffffff' 
-        : isError
-          ? '#c33'
-          : 'var(--color-text-dark, #333)',
+      background: isError
+        ? '#fee'
+        : 'var(--color-background-base, #f8f8f8)',
+      color: isError
+        ? '#c33'
+        : 'var(--color-text-dark, #333)',
       fontSize: '14px',
       lineHeight: '1.6',
       wordWrap: 'break-word',
       whiteSpace: 'pre-wrap',
-      boxShadow: isUser 
-        ? '0 2px 8px rgba(151, 51, 238, 0.2)' 
-        : '0 1px 4px rgba(0, 0, 0, 0.05)',
-      borderBottomRightRadius: isUser ? '4px' : '16px',
-      borderBottomLeftRadius: isUser ? '16px' : '4px',
+      border: '1px solid var(--color-foreground-base, #e5e7eb)',
     },
     timestamp: {
       fontSize: '11px',
@@ -60,6 +78,14 @@ export const ChatMessage = ({ message }) => {
   
   return (
     <div style={styles.container}>
+      {isUser && (
+        <div style={styles.header}>
+          <div style={styles.avatar}>
+            {getInitials()}
+          </div>
+          <span>You</span>
+        </div>
+      )}
       <div style={styles.bubble}>
         {message.content}
       </div>

@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef } from 'preact/hooks'
 import { ChatMessage } from './ChatMessage'
+import { MessageGroup } from './MessageGroup'
 import { ChatInput } from './ChatInput'
 import { AIBuilderAPI } from './api'
 
@@ -71,6 +72,165 @@ export const AIBuilder = () => {
     }
   }
 
+  // Group messages for rendering (group consecutive assistant tool messages)
+  const renderMessages = () => {
+    const rendered = []
+    let currentGroup = []
+    let showGroupHeader = false
+
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i]
+      
+      if (msg.role === 'user' || msg.role === 'error') {
+        // Flush current group if any
+        if (currentGroup.length > 0) {
+          rendered.push(
+            <MessageGroup 
+              key={`group-${i}`}
+              messages={currentGroup}
+              showHeader={showGroupHeader}
+            />
+          )
+          currentGroup = []
+          showGroupHeader = false
+        }
+        // Render user/error message
+        rendered.push(<ChatMessage key={i} message={msg} />)
+      } else if (msg.role === 'assistant') {
+        // Check if this starts a new group (first assistant message or after user message)
+        if (currentGroup.length === 0) {
+          showGroupHeader = true
+        }
+        currentGroup.push(msg)
+      }
+    }
+
+    // Flush remaining group
+    if (currentGroup.length > 0) {
+      rendered.push(
+        <MessageGroup 
+          key={`group-final`}
+          messages={currentGroup}
+          showHeader={showGroupHeader}
+        />
+      )
+    }
+
+    return rendered
+  }
+
+  const handleCommand = async (commandName) => {
+    console.log('[nodeFlip] Executing command:', commandName)
+    
+    // Add command message to UI
+    const commandMsg = {
+      role: 'user',
+      content: `/${commandName}`,
+      timestamp: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, commandMsg])
+    setIsSending(true)
+    
+    try {
+      if (commandName === 'sync-global-nodes' || commandName === 'sync-custom-nodes') {
+        // Add status message
+        const statusMsg = {
+          role: 'assistant',
+          content: `⏳ Extracting ${commandName === 'sync-global-nodes' ? 'standard' : 'custom'} nodes from n8n...`,
+          timestamp: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, statusMsg])
+        
+        // Execute catalog sync via page context
+        const messageId = `${commandName}-${Date.now()}`
+        const catalogType = commandName === 'sync-global-nodes' ? 'standard' : 'custom'
+        
+        // Request extraction from page context
+        const catalogPromise = new Promise((resolve, reject) => {
+          const handler = (event) => {
+            if (event.data.type === 'nodeflip-catalog-response' && event.data.messageId === messageId) {
+              window.removeEventListener('message', handler)
+              resolve(event.data.catalog)
+            }
+          }
+          window.addEventListener('message', handler)
+          setTimeout(() => {
+            window.removeEventListener('message', handler)
+            reject(new Error('Timeout waiting for catalog extraction'))
+          }, 15000)
+        })
+        
+        window.postMessage({
+          type: 'nodeflip-extract-catalog',
+          messageId: messageId,
+          catalogType: catalogType
+        }, '*')
+        
+        const catalog = await catalogPromise
+        
+        if (!catalog || catalog.length === 0) {
+          throw new Error('No nodes found. Make sure n8n is fully loaded.')
+        }
+        
+        // Update status
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = {
+            ...newMessages[newMessages.length - 1],
+            content: `✓ Extracted ${catalog.length} nodes. Syncing to backend...`
+          }
+          return newMessages
+        })
+        
+        // Send to backend
+        const api = apiRef.current
+        const config = await api.getConfig()
+        
+        // Map catalog type to endpoint
+        const endpoint = catalogType === 'standard' ? 'sync-global' : 'sync-custom'
+        
+        const response = await fetch(`${config.backendUrl}/api/v1/node-catalog/${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ catalog })
+        })
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Backend error: ${response.status} ${errorText}`)
+        }
+        
+        const result = await response.json()
+        
+        // Update with success
+        setMessages(prev => {
+          const newMessages = [...prev]
+          newMessages[newMessages.length - 1] = {
+            ...newMessages[newMessages.length - 1],
+            content: `✅ ${result.message || `Synced ${result.indexed} nodes successfully!`}`
+          }
+          return newMessages
+        })
+      }
+    } catch (error) {
+      console.error('[nodeFlip] Command failed:', error)
+      setMessages(prev => {
+        const newMessages = [...prev]
+        newMessages[newMessages.length - 1] = {
+          role: 'error',
+          content: `❌ ${error.message}`,
+          timestamp: new Date().toISOString()
+        }
+        return newMessages
+      })
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   const handleSendMessage = async (text) => {
     if (!chatId || isSending) return
     
@@ -123,7 +283,34 @@ export const AIBuilder = () => {
             const messages = parsed.messages || []
             
             for (const msg of messages) {
-              if (msg.type === 'message' && msg.text) {
+              if (msg.type === 'tool') {
+                // Tool execution message - add as separate message
+                const toolMessage = {
+                  role: 'assistant',
+                  type: 'tool',
+                  toolName: msg.toolName || msg.displayTitle || 'Processing',
+                  toolCallId: msg.toolCallId,
+                  status: msg.status || 'running',
+                  timestamp: new Date().toISOString()
+                }
+                
+                // Check if tool message already exists (update status)
+                setMessages(prev => {
+                  const existingIndex = prev.findIndex(
+                    m => m.type === 'tool' && m.toolCallId === msg.toolCallId
+                  )
+                  
+                  if (existingIndex >= 0) {
+                    // Update existing tool message status
+                    const updated = [...prev]
+                    updated[existingIndex] = { ...updated[existingIndex], status: msg.status }
+                    return updated
+                  } else {
+                    // Add new tool message
+                    return [...prev, toolMessage]
+                  }
+                })
+              } else if (msg.type === 'message' && msg.text) {
                 // Regular text message
                 assistantMessage.content += msg.text
                 setMessages(prev => {
@@ -426,16 +613,15 @@ export const AIBuilder = () => {
           </div>
         ) : (
           <>
-            {messages.map((msg, i) => (
-              <ChatMessage key={i} message={msg} />
-            ))}
+            {renderMessages()}
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
       <ChatInput 
-        onSend={handleSendMessage} 
+        onSend={handleSendMessage}
+        onCommand={handleCommand}
         disabled={isSending || !chatId || !!error} 
       />
     </div>

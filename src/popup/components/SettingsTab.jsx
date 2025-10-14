@@ -1,7 +1,6 @@
 import { useState } from 'preact/hooks'
 import { Input } from './Input'
 import { Button } from './Button'
-import { SyncSection } from './SyncSection'
 
 export const SettingsTab = ({
   backendUrl,
@@ -193,8 +192,6 @@ export const SettingsTab = ({
           Get your API key from your backend dashboard. Make sure the URL includes the protocol (https://).
         </p>
       </div>
-      
-      <SyncSection colors={colors} />
       
       <div style={styles.card}>
         <h3 style={styles.title}>💬 Chat Settings</h3>
