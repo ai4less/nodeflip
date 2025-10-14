@@ -78,14 +78,21 @@ export class AIBuilderAPI {
       
       if (response.ok) {
         const data = await response.json()
-        // Look for chats with our workflow ID in the title
-        const workflowId = this.getWorkflowId()
-        const matchingChat = data.find(chat => 
-          chat.title && chat.title.includes(workflowId)
-        )
         
-        if (matchingChat) {
-          return matchingChat.id
+        // Handle different response formats
+        // Some APIs return { items: [...] } or { results: [...] } or just [...]
+        const chatList = Array.isArray(data) ? data : (data.items || data.results || data.data || [])
+        
+        if (Array.isArray(chatList) && chatList.length > 0) {
+          // Look for chats with our workflow ID in the title
+          const workflowId = this.getWorkflowId()
+          const matchingChat = chatList.find(chat => 
+            chat.title && chat.title.includes(workflowId)
+          )
+          
+          if (matchingChat) {
+            return matchingChat.id
+          }
         }
       }
     } catch (error) {
