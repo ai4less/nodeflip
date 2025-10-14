@@ -1,4 +1,3 @@
-
 /**
  * Chat Input Component
  * Input field for sending messages with command support
@@ -49,14 +48,17 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
   }, [value])
 
-  const executeCommand = useCallback((command) => {
-    if (!command || !onCommand) return
-    onCommand(command.name)
-    setValue('')
-    closeMenu()
-  }, [closeMenu, onCommand])
+  const executeCommand = useCallback(
+    command => {
+      if (!command || !onCommand) return
+      onCommand(command.name)
+      setValue('')
+      closeMenu()
+    },
+    [closeMenu, onCommand],
+  )
 
-  const autocompleteCommand = useCallback((command) => {
+  const autocompleteCommand = useCallback(command => {
     if (!command) return
     setValue(`/${command.name}`)
     requestAnimationFrame(() => {
@@ -74,7 +76,7 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
 
     if (value.startsWith('/')) {
       const commandName = value.slice(1).split(' ')[0]
-      const command = COMMANDS.find((item) => item.name === commandName)
+      const command = COMMANDS.find(item => item.name === commandName)
       if (command) {
         executeCommand(command)
         return
@@ -86,13 +88,13 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
     closeMenu()
   }, [value, disabled, executeCommand, onSend, closeMenu])
 
-  const handleInput = (event) => {
+  const handleInput = event => {
     const nextValue = event.target.value
     setValue(nextValue)
     handleValueChange(nextValue)
   }
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = event => {
     const handled = handlePaletteKeyDown(event, {
       onSubmit: handleSubmit,
       onExecuteCommand: executeCommand,
@@ -106,7 +108,7 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
+    const handleClickOutside = event => {
       if (
         commandMenuRef.current &&
         !commandMenuRef.current.contains(event.target) &&
@@ -185,9 +187,10 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
       height: '42px',
       borderRadius: '10px',
       border: 'none',
-      background: disabled || !value.trim()
-        ? 'var(--color-foreground-base, #ccc)'
-        : 'linear-gradient(135deg, #9733EE 0%, #DA22FF 100%)',
+      background:
+        disabled || !value.trim()
+          ? 'var(--color-foreground-base, #ccc)'
+          : 'linear-gradient(135deg, #9733EE 0%, #DA22FF 100%)',
       color: '#ffffff',
       cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
       display: 'flex',
@@ -210,7 +213,7 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
           <CommandMenu
             commands={filteredCommands}
             selectedIndex={selectedIndex}
-            onSelect={(command) => selectCommand(command, executeCommand)}
+            onSelect={command => selectCommand(command, executeCommand)}
             onHover={highlightCommand}
             menuRef={commandMenuRef}
           />
@@ -252,20 +255,20 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
           </svg>
         </button>
       </div>
-      
+
       <div style={styles.creditsBar}>
         <div style={styles.creditsInfo}>
           <span style={styles.creditsText}>
             <span style={styles.creditsCount}>∞</span> credits available
           </span>
         </div>
-        <a 
-          href="https://nodeflip.ai" 
-          target="_blank" 
+        <a
+          href="https://nodeflip.ai"
+          target="_blank"
           rel="noopener noreferrer"
           style={styles.getMoreLink}
         >
-          About nodeFlip
+          About NodeFlip
         </a>
       </div>
     </div>

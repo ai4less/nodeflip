@@ -5,7 +5,7 @@ const nodeflipIconUrl =
     ? chrome.runtime.getURL(nodeflipIcon)
     : nodeflipIcon
 
-export const AIBuilderHeader = ({ onClose }) => {
+export const AIBuilderHeader = ({ onClose, onNewChat }) => {
   const styles = {
     header: {
       height: '65px',
@@ -41,7 +41,11 @@ export const AIBuilderHeader = ({ onClose }) => {
       textTransform: 'uppercase',
       letterSpacing: '0.5px',
     },
-    closeButton: {
+    buttonGroup: {
+      display: 'flex',
+      gap: '8px',
+    },
+    iconButton: {
       background: 'transparent',
       border: 'none',
       cursor: 'pointer',
@@ -62,6 +66,12 @@ export const AIBuilderHeader = ({ onClose }) => {
     />
   )
 
+  const handleNewChat = () => {
+    if (confirm('Start a new chat? This will clear your current conversation history.')) {
+      onNewChat()
+    }
+  }
+
   return (
     <div style={styles.header}>
       <div style={styles.titleContainer}>
@@ -71,26 +81,48 @@ export const AIBuilderHeader = ({ onClose }) => {
         </div>
         <span style={styles.betaBadge}>Beta</span>
       </div>
-      <button
-        style={styles.closeButton}
-        onClick={onClose}
-        onMouseEnter={event => {
-          event.currentTarget.style.background = 'var(--color-background-base, #eee)'
-        }}
-        onMouseLeave={event => {
-          event.currentTarget.style.background = 'transparent'
-        }}
-        title="Close sidebar"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M18 6L6 18M6 6l12 12"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+      <div style={styles.buttonGroup}>
+        <button
+          style={styles.iconButton}
+          onClick={handleNewChat}
+          onMouseEnter={event => {
+            event.currentTarget.style.background = 'var(--color-background-base, #eee)'
+          }}
+          onMouseLeave={event => {
+            event.currentTarget.style.background = 'transparent'
+          }}
+          title="New chat"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 5v14m-7-7h14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          style={styles.iconButton}
+          onClick={onClose}
+          onMouseEnter={event => {
+            event.currentTarget.style.background = 'var(--color-background-base, #eee)'
+          }}
+          onMouseLeave={event => {
+            event.currentTarget.style.background = 'transparent'
+          }}
+          title="Close sidebar"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M18 6L6 18M6 6l12 12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }

@@ -19,7 +19,6 @@ export default defineManifest({
     default_icon: 'img/logo-48.png',
   },
   options_page: 'options.html',
-  devtools_page: 'devtools.html',
   background: {
     service_worker: 'src/background/index.js',
     type: 'module',
@@ -30,17 +29,11 @@ export default defineManifest({
       js: ['src/contentScript/index.jsx'],
     },
   ],
-  side_panel: {
-    default_path: 'sidepanel.html',
-  },
   web_accessible_resources: [
     {
       resources: ['img/logo-16.png', 'img/logo-32.png', 'img/logo-48.png', 'img/logo-128.png', 'src/contentScript/n8nStore.js', 'src/contentScript/catalogExtractor.js', 'src/assets/nodeflip.svg'],
       matches: ['http://*/*', 'https://*/*'],
     },
   ],
-  permissions: ['sidePanel', 'storage'],
-  chrome_url_overrides: {
-    newtab: 'newtab.html',
-  },
+  permissions: ['storage'],
 })

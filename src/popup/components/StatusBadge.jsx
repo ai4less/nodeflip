@@ -5,29 +5,27 @@ export const StatusBadge = ({ status, label, colors }) => {
     badge: {
       display: 'inline-flex',
       alignItems: 'center',
-      gap: '6px',
-      padding: '6px 12px',
-      borderRadius: '20px',
-      background: 'rgba(0, 0, 0, 0.3)',
-      fontSize: '12px',
+      gap: '5px',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      fontSize: '11px',
+      fontWeight: 500,
+      background: 'rgba(255, 255, 255, 0.1)',
+      color: '#E8E8E8',
+      border: '1px solid rgba(255, 255, 255, 0.15)',
     },
     dot: {
-      width: '8px',
-      height: '8px',
+      width: '5px',
+      height: '5px',
       borderRadius: '50%',
-      background: isConnected ? colors.success : colors.error,
-      boxShadow: isConnected ? '0 0 12px rgba(124, 58, 237, 0.6)' : 'none',
-      animation: isConnected ? 'pulse 2s ease-in-out infinite' : 'none',
+      background: isConnected ? colors.connected : colors.disconnected,
     },
-    label: {
-      color: colors.white,
-    }
   }
   
   return (
     <div style={styles.badge}>
       <span style={styles.dot} />
-      <span style={styles.label}>{label}</span>
+      <span>{label}</span>
     </div>
   )
 }

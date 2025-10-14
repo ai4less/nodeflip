@@ -2,7 +2,6 @@
 import { useState, useCallback } from 'preact/hooks'
 
 import { BackendSettingsCard } from './BackendSettingsCard'
-import { ChatSettingsCard } from './ChatSettingsCard'
 import { useStatusMessage } from '../hooks/useStatusMessage'
 
 export const SettingsTab = ({
@@ -15,7 +14,6 @@ export const SettingsTab = ({
 }) => {
   const [isTesting, setIsTesting] = useState(false)
   const backendStatus = useStatusMessage()
-  const chatStatus = useStatusMessage()
 
   const handleTestConnection = useCallback(async () => {
     if (!backendUrl || !apiKey) {
@@ -53,33 +51,7 @@ export const SettingsTab = ({
     backendStatus.showStatus('✓ Settings saved successfully')
   }, [apiKey, backendStatus, backendUrl, onSave])
 
-  const handleClearChat = useCallback(async () => {
-    if (confirm('Clear all chat history? This cannot be undone.')) {
-      await chrome.storage.local.remove(['chatMessages', 'chatId'])
-      chatStatus.showStatus('✓ Chat history cleared')
-    }
-  }, [chatStatus])
 
-  const handleToggleChatBubble = useCallback(async () => {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-
-      if (!tab) {
-        chatStatus.showStatus('❌ No active tab found')
-        return
-      }
-
-      chrome.tabs.sendMessage(tab.id, { type: 'nodeFlipToggleChatBubble' }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Error toggling chat bubble:', chrome.runtime.lastError.message)
-        }
-      })
-
-      window.close()
-    } catch (error) {
-      chatStatus.showStatus('❌ Failed to toggle chat bubble')
-    }
-  }, [chatStatus])
 
   const styles = {
     container: {
@@ -102,13 +74,6 @@ export const SettingsTab = ({
         onTestConnection={handleTestConnection}
         status={backendStatus.status}
         isTesting={isTesting}
-        colors={colors}
-      />
-
-      <ChatSettingsCard
-        onToggleChatBubble={handleToggleChatBubble}
-        onClearChat={handleClearChat}
-        status={chatStatus.status}
         colors={colors}
       />
     </div>

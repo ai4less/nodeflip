@@ -10,10 +10,9 @@ export class AIBuilderAPI {
 
   /**
    * Get configuration from chrome.storage.sync
+   * Always fetches fresh config from storage to ensure latest values
    */
   async getConfig() {
-    if (this.config) return this.config
-    
     return new Promise((resolve) => {
       chrome.storage.sync.get(['backendUrl', 'apiKey'], (data) => {
         this.config = {

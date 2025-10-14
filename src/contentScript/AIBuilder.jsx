@@ -98,7 +98,15 @@ export const AIBuilder = () => {
       setMessages(loadedMessages)
     } catch (err) {
       console.error('[nodeFlip] Failed to load chat:', err)
-      setError(err.message || 'Failed to load chat. Please check your connection.')
+      
+      // Check if it's an authentication error
+      if (err.message && (err.message.includes('401') || err.message.includes('Invalid credentials'))) {
+        setError('Please configure your API credentials in the extension popup, then refresh the page.')
+      } else if (err.message && err.message.includes('Backend not configured')) {
+        setError('Please configure your backend URL and API key in the extension popup.')
+      } else {
+        setError(err.message || 'Failed to load chat. Please check your connection.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -596,6 +604,19 @@ export const AIBuilder = () => {
     }
   }, [])
 
+  const handleNewChat = useCallback(async () => {
+    // Clear chat data from storage
+    await chrome.storage.local.remove(['chatMessages', 'chatId'])
+    
+    // Reset state
+    setChatId(null)
+    setMessages([])
+    setPendingApproval(null)
+    
+    // Load new chat
+    await loadChat()
+  }, [loadChat])
+
   const styles = createContainerStyles(width, isResizing, isVisible)
   const inputDisabled = isSending || !chatId || !!error || !!pendingApproval
   const approvalData = !isSending ? pendingApproval : null
@@ -625,7 +646,7 @@ export const AIBuilder = () => {
         <div style={styles.resizer} onMouseDown={handleMouseDown} />
         <div style={styles.wrapper}>
           <div style={styles.container}>
-            <AIBuilderHeader onClose={handleClose} />
+            <AIBuilderHeader onClose={handleClose} onNewChat={handleNewChat} />
 
             <MessagesPanel
               messages={messages}

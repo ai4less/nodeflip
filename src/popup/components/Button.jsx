@@ -1,5 +1,3 @@
-import { useState } from 'preact/hooks'
-
 export const Button = ({ 
   children, 
   variant = 'primary', 
@@ -9,68 +7,61 @@ export const Button = ({
   icon,
   colors 
 }) => {
-  const [isHovered, setIsHovered] = useState(false)
-  
-  const baseStyles = {
-    padding: '12px 24px',
-    border: 'none',
-    borderRadius: '12px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: disabled || loading ? 'not-allowed' : 'pointer',
-    transition: 'all 300ms ease',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    opacity: disabled ? 0.5 : 1,
-    outline: 'none',
-  }
-  
-  const variantStyles = {
-    primary: {
-      background: colors.gradientPrimary,
-      color: colors.white,
-      boxShadow: isHovered && !disabled && !loading 
-        ? '0 8px 25px rgba(151, 51, 238, 0.4)' 
-        : '0 4px 15px rgba(151, 51, 238, 0.3)',
-      transform: isHovered && !disabled && !loading 
-        ? 'translateY(-2px)' 
-        : 'translateY(0)',
-    },
-    secondary: {
-      background: isHovered && !disabled 
-        ? 'rgba(151, 51, 238, 0.1)' 
-        : 'transparent',
-      border: `2px solid ${colors.purple500}`,
-      color: colors.purple400,
-      transform: isHovered && !disabled ? 'scale(1.02)' : 'scale(1)',
-    }
-  }
-  
-  const spinnerStyles = {
-    width: '16px',
-    height: '16px',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-    borderTopColor: colors.white,
-    borderRadius: '50%',
-    animation: 'spin 800ms linear infinite',
-  }
+  const isPrimary = variant === 'primary'
   
   const styles = {
-    ...baseStyles,
-    ...variantStyles[variant],
+    button: {
+      flex: 1,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      padding: '8px 14px',
+      fontSize: '13px',
+      fontWeight: 500,
+      border: isPrimary ? 'none' : `1px solid ${colors.border}`,
+      borderRadius: '6px',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.15s',
+      opacity: disabled ? 0.5 : 1,
+      background: isPrimary 
+        ? colors.primary
+        : colors.bg,
+      color: isPrimary ? '#FFFFFF' : colors.text,
+      fontFamily: 'inherit',
+    },
+    spinner: {
+      width: '12px',
+      height: '12px',
+      border: '2px solid rgba(255, 255, 255, 0.3)',
+      borderTopColor: '#FFFFFF',
+      borderRadius: '50%',
+      animation: 'spin 0.6s linear infinite',
+    }
   }
-  
+
   return (
     <button
-      style={styles}
+      style={styles.button}
       onClick={onClick}
       disabled={disabled || loading}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={event => {
+        if (!disabled) {
+          event.currentTarget.style.background = isPrimary 
+            ? colors.primaryHover
+            : colors.bgSecondary
+        }
+      }}
+      onMouseLeave={event => {
+        if (!disabled) {
+          event.currentTarget.style.background = isPrimary 
+            ? colors.primary
+            : colors.bg
+        }
+      }}
     >
-      {loading && <span style={spinnerStyles} />}
-      {icon && <span>{icon}</span>}
+      {loading && <span style={styles.spinner} />}
+      {icon && !loading && <span>{icon}</span>}
       <span>{children}</span>
     </button>
   )

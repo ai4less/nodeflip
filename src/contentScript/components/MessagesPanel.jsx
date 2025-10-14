@@ -51,6 +51,10 @@ export const MessagesPanel = ({
   isSending,
   messagesEndRef,
 }) => {
+  const handleOpenSettings = () => {
+    // Open the extension popup
+    chrome.runtime.sendMessage({ type: 'openPopup' })
+  }
   const styles = {
     container: {
       backgroundColor: 'var(--color-background-light, #f5f5f5)',
@@ -80,23 +84,47 @@ export const MessagesPanel = ({
     error: {
       textAlign: 'center',
       padding: '40px 30px',
-      color: '#c33',
+      color: '#57606A',
       fontSize: '14px',
       lineHeight: 1.6,
-      background: '#fee',
+      background: '#F8F9FA',
       borderRadius: '8px',
       margin: '20px',
+      border: '1px solid #E1E4E8',
     },
-    retryButton: {
+    errorTitle: {
+      fontSize: '16px',
+      fontWeight: 600,
+      color: '#24292F',
+      marginBottom: '8px',
+    },
+    buttonGroup: {
       marginTop: '16px',
-      padding: '10px 20px',
-      background: 'linear-gradient(135deg, #9733EE 0%, #DA22FF 100%)',
+      display: 'flex',
+      gap: '8px',
+      justifyContent: 'center',
+    },
+    primaryButton: {
+      padding: '8px 16px',
+      background: '#7C3AED',
       color: '#fff',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: '6px',
       cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: 600,
+      fontSize: '13px',
+      fontWeight: 500,
+      transition: 'background 0.15s',
+    },
+    secondaryButton: {
+      padding: '8px 16px',
+      background: 'transparent',
+      color: '#57606A',
+      border: '1px solid #E1E4E8',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontSize: '13px',
+      fontWeight: 500,
+      transition: 'all 0.15s',
     },
     placeholder: {
       textAlign: 'center',
@@ -147,10 +175,32 @@ export const MessagesPanel = ({
     return (
       <div style={styles.container}>
         <div style={styles.error}>
+          <div style={styles.errorTitle}>Configuration Required</div>
           <div>{error}</div>
-          <button style={styles.retryButton} onClick={onRetry}>
-            Retry
-          </button>
+          <div style={styles.buttonGroup}>
+            <button 
+              style={styles.primaryButton} 
+              onClick={handleOpenSettings}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#6D28D9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#7C3AED'}
+            >
+              Open Settings
+            </button>
+            <button 
+              style={styles.secondaryButton}
+              onClick={onRetry}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#F8F9FA'
+                e.currentTarget.style.borderColor = '#D0D7DE'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.borderColor = '#E1E4E8'
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     )
