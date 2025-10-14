@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
 
-import './SidePanel.css'
+import './Sidepanel.css'
 
 export const SidePanel = () => {
   const [countSync, setCountSync] = useState(0)
