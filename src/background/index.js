@@ -1,8 +1,10 @@
-console.log('background is running')
+import { logger } from '../utils/logger.js'
+
+logger.info('NodeFlip background service worker started')
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'COUNT') {
-    console.log('background has received a message from popup, and count is ', request?.count)
+    logger.log('background has received a message from popup, and count is ', request?.count)
   }
   
   if (request.type === 'openPopup') {

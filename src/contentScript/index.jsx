@@ -6,13 +6,14 @@
 import { render } from 'preact'
 import { AIBuilder } from './AIBuilder'
 import nodeflipIcon from '@src/assets/nodeflip.svg'
+import { logger } from '@src/utils/logger'
 
 const nodeflipIconUrl =
   typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
     ? chrome.runtime.getURL(nodeflipIcon)
     : nodeflipIcon
 
-console.info('[nodeFlip] Content script loaded')
+logger.info('[nodeFlip] Content script loaded')
 
 let sidebarContainer = null
 
@@ -63,11 +64,11 @@ function injectN8NStoreScript () {
   script.src = chrome.runtime.getURL('src/contentScript/n8nStore.js')
   script.type = 'module'
   script.onload = () => {
-    console.log('[nodeFlip] n8nStore script injected into page context')
+    logger.log('[nodeFlip] n8nStore script injected into page context')
     script.remove()
   }
   script.onerror = error => {
-    console.error('[nodeFlip] Failed to load n8nStore script:', error)
+    logger.error('[nodeFlip] Failed to load n8nStore script:', error)
   }
   ;(document.head || document.documentElement).appendChild(script)
 }
@@ -77,7 +78,7 @@ function injectN8NStoreScript () {
  */
 async function injectAIBuilder () {
   if (!isWorkflowPage()) {
-    console.log('[nodeFlip] Not on workflow page, skipping injection')
+    logger.log('[nodeFlip] Not on workflow page, skipping injection')
     return
   }
 
@@ -87,7 +88,7 @@ async function injectAIBuilder () {
 
     // Wait for n8n app to be ready
     const n8nApp = await waitForElement('#n8n-app')
-    console.log('[nodeFlip] n8n app found, injecting AI Builder')
+    logger.log('[nodeFlip] n8n app found, injecting AI Builder')
 
     // Create sidebar container
     sidebarContainer = document.createElement('div')
@@ -100,12 +101,12 @@ async function injectAIBuilder () {
 
     // Render Preact component
     render(<AIBuilder />, sidebarContainer)
-    console.log('[nodeFlip] AI Builder sidebar injected')
+    logger.log('[nodeFlip] AI Builder sidebar injected')
 
     // Inject toggle button
     await injectToggleButton()
   } catch (error) {
-    console.error('[nodeFlip] Failed to inject AI Builder:', error)
+    logger.error('[nodeFlip] Failed to inject AI Builder:', error)
   }
 }
 
@@ -163,9 +164,9 @@ async function injectToggleButton () {
       wrapper.appendChild(button)
     }
 
-    console.log('[nodeFlip] Toggle button injected')
+    logger.log('[nodeFlip] Toggle button injected')
   } catch (error) {
-    console.error('[nodeFlip] Failed to inject toggle button:', error)
+    logger.error('[nodeFlip] Failed to inject toggle button:', error)
   }
 }
 

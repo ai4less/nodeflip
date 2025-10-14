@@ -1,16 +1,19 @@
 {
   "name": "nodeflip",
-  "displayName": "nodeflip",
-  "version": "0.0.0",
+  "displayName": "NodeFlip AI",
+  "version": "1.0.0",
   "author": "ai4less",
-  "description": "",
+  "description": "AI-powered assistant for building n8n workflows through natural conversation.",
   "type": "module",
   "license": "AGPL-3.0",
+  "homepage": "https://ai4less.io",
   "keywords": [
-    "chrome-extension",
-    "preact",
-    "vite",
-    "create-chrome-ext"
+    "n8n",
+    "workflow",
+    "automation",
+    "ai",
+    "assistant",
+    "productivity"
   ],
   "engines": {
     "node": ">=14.18.0"
