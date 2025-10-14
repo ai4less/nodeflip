@@ -70,6 +70,10 @@ export const MessageGroup = ({ messages, showHeader = false }) => {
               />
             )
           } else {
+            // Skip empty messages (messages with no content)
+            if (!msg.content || msg.content.trim() === '') {
+              return null
+            }
             return (
               <ChatMessage 
                 key={idx}

@@ -419,6 +419,47 @@ if (typeof window !== 'undefined') {
         }, '*');
       }
     }
+    
+    if (message.type === 'n8nStore-addConnection') {
+      console.log('[DEBUG] ========== CONNECTION REQUEST ==========');
+      console.log('[n8nStore] Received addConnection request:', 
+        message.sourceNodeName, '->', message.targetNodeName);
+      console.log('[DEBUG] Message details:', JSON.stringify(message, null, 2));
+      
+      try {
+        const result = addConnection(
+          message.sourceNodeName,
+          message.targetNodeName,
+          message.sourceOutputType || 'main',
+          message.targetInputType || 'main',
+          message.sourceOutputIndex || 0,
+          message.targetInputIndex || 0
+        );
+        
+        if (result) {
+          console.log('[n8nStore] Connection added successfully');
+          window.postMessage({
+            type: 'n8nStore-response',
+            messageId: message.messageId,
+            success: true,
+            result: {
+              source: message.sourceNodeName,
+              target: message.targetNodeName
+            }
+          }, '*');
+        } else {
+          throw new Error('Failed to add connection');
+        }
+      } catch (error) {
+        console.error('[n8nStore] Failed to add connection:', error);
+        window.postMessage({
+          type: 'n8nStore-response',
+          messageId: message.messageId,
+          success: false,
+          error: error.message
+        }, '*');
+      }
+    }
   });
   
   // Listen for catalog extraction requests

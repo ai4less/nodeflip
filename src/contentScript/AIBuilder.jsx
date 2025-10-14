@@ -43,6 +43,86 @@ export const AIBuilder = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+  
+  // Add canvas overlay when generating
+  useEffect(() => {
+    const canvasContainer = document.querySelector('.vue-flow__viewport') || 
+                            document.querySelector('.vue-flow__container')
+    
+    if (isSending && canvasContainer) {
+      // Create overlay
+      const overlay = document.createElement('div')
+      overlay.id = 'nodeflip-generation-overlay'
+      overlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        animation: fadeIn 0.2s ease-out;
+      `
+      
+      // Add loading indicator
+      overlay.innerHTML = `
+        <div style="
+          background: white;
+          padding: 20px 32px;
+          border-radius: 12px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        ">
+          <div style="
+            width: 24px;
+            height: 24px;
+            border: 3px solid #7C3AED;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          "></div>
+          <span style="
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+          ">Building workflow...</span>
+        </div>
+        <style>
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+        </style>
+      `
+      
+      // Append to canvas parent (so it covers the viewport)
+      const parent = canvasContainer.parentElement || canvasContainer
+      parent.style.position = 'relative'  // Ensure parent is positioned
+      parent.appendChild(overlay)
+      
+      console.log('[nodeFlip] Added canvas overlay for generation')
+    } else {
+      // Remove overlay
+      const overlay = document.getElementById('nodeflip-generation-overlay')
+      if (overlay) {
+        overlay.remove()
+        console.log('[nodeFlip] Removed canvas overlay')
+      }
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      const overlay = document.getElementById('nodeflip-generation-overlay')
+      if (overlay) overlay.remove()
+    }
+  }, [isSending])
 
   const loadChat = async () => {
     try {
@@ -269,11 +349,16 @@ export const AIBuilder = () => {
         timestamp: new Date().toISOString()
       }
       
+      // Track full messages to prevent duplicates
+      const seenMessages = []
+      
       setMessages(prev => [...prev, assistantMessage])
       
       // n8n-style streaming with custom delimiter
       const N8N_DELIMITER = '⧉⇋⇋➽⌑⧉§§'
       let buffer = ''
+      
+      let hasToolCalls = false
       
       while (true) {
         const { done, value } = await reader.read()
@@ -294,6 +379,9 @@ export const AIBuilder = () => {
             
             for (const msg of messages) {
               if (msg.type === 'tool') {
+                // Mark that we've seen tool calls
+                hasToolCalls = true
+                
                 // Tool execution message - add as separate message
                 const toolMessage = {
                   role: 'assistant',
@@ -320,16 +408,47 @@ export const AIBuilder = () => {
                     return [...prev, toolMessage]
                   }
                 })
-              } else if (msg.type === 'message' && msg.text) {
-                // Regular text message
+              } else if (msg.type === 'message' && msg.text) {                
+                seenMessages.push(msg.text)
                 assistantMessage.content += msg.text
+                
                 setMessages(prev => {
                   const newMessages = [...prev]
                   newMessages[newMessages.length - 1] = { ...assistantMessage }
+                  
+                  // If tools were called, check for duplicates immediately
+                  if (hasToolCalls) {
+                    const assistantMessages = newMessages.filter(m => m.role === 'assistant' && !m.type)
+                    
+                    if (assistantMessages.length >= 2) {
+                      const lastMsg = assistantMessages[assistantMessages.length - 1]
+                      const secondLastMsg = assistantMessages[assistantMessages.length - 2]
+                      
+                      const getFirst10Words = (text) => text.trim().split(/\s+/).slice(0, 10).join(' ')
+                      
+                      if (lastMsg.content && secondLastMsg.content) {
+                        const lastFirst10 = getFirst10Words(lastMsg.content)
+                        const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
+                        
+                        if (lastFirst10 === secondLastFirst10) {
+                          const secondLastIndex = newMessages.indexOf(secondLastMsg)
+                          if (secondLastIndex >= 0) {
+                            newMessages.splice(secondLastIndex, 1)
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
                   return newMessages
                 })
               } else if (msg.type === 'node_suggestion' && msg.data) {
                 // Node suggestion - add node to workflow automatically via page context
+                console.log('[DEBUG] Node suggestion received:', {
+                  nodeName: msg.data.node?.name,
+                  previousNode: msg.data.previousNode,
+                  hasPreviousNode: !!msg.data.previousNode
+                })
                 if (msg.data.node) {
                   try {
                     console.log('[nodeFlip] Received node suggestion:', msg.data.node)
@@ -369,16 +488,69 @@ export const AIBuilder = () => {
                     await addNodePromise
                     console.log('[nodeFlip] Node added successfully')
                     
+                    // Auto-connect to previous node if specified
+                    if (msg.data.previousNode) {
+                      console.log(`[nodeFlip] Auto-connecting: ${msg.data.previousNode} → ${msg.data.node.name}`)
+                      
+                      try {
+                        // Wait a bit for node to be fully added
+                        await new Promise(resolve => setTimeout(resolve, 500))
+                        
+                        // Send connection request to page context
+                        const connectionPromise = new Promise((resolve, reject) => {
+                          const messageId = `add-connection-${Date.now()}`
+                          
+                          const handleResponse = (event) => {
+                            if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
+                              window.removeEventListener('message', handleResponse)
+                              if (event.data.success) {
+                                resolve(event.data.result)
+                              } else {
+                                reject(new Error(event.data.error || 'Failed to add connection'))
+                              }
+                            }
+                          }
+                          
+                          window.addEventListener('message', handleResponse)
+                          
+                          // Send connection request
+                          window.postMessage({
+                            type: 'n8nStore-addConnection',
+                            messageId: messageId,
+                            sourceNodeName: msg.data.previousNode,
+                            targetNodeName: msg.data.node.name,
+                            sourceOutputType: 'main',
+                            targetInputType: 'main',
+                            sourceOutputIndex: 0,
+                            targetInputIndex: 0
+                          }, '*')
+                          
+                          // Timeout after 5 seconds
+                          setTimeout(() => {
+                            window.removeEventListener('message', handleResponse)
+                            reject(new Error('Timeout waiting for connection'))
+                          }, 5000)
+                        })
+                        
+                        await connectionPromise
+                        console.log(`[nodeFlip] Connection created: ${msg.data.previousNode} → ${msg.data.node.name}`)
+                      } catch (error) {
+                        // Log but don't fail - connection is optional
+                        console.error('[nodeFlip] Failed to create connection:', error)
+                      }
+                    }
+                    
                     // Set pending approval state
                     setPendingApproval({
                       nodeName: msg.data.node.name,
                       nodeType: msg.data.node.type
                     })
                     
-                    // Show success message
-                    const successMsg = msg.data.chat_message || 
-                      `Added ${msg.data.node.name} to workflow`
-                    assistantMessage.content += successMsg
+                    // Don't show auto-generated message - backend handles explanations
+                    // Only show if backend explicitly sends chat_message
+                    if (msg.data.chat_message) {
+                      assistantMessage.content += msg.data.chat_message
+                    }
                   } catch (error) {
                     console.error('[nodeFlip] Failed to add node:', error)
                     assistantMessage.content += `\n\n⚠️ Failed to add node: ${error.message}`
@@ -444,6 +616,41 @@ export const AIBuilder = () => {
           }
         }
       }
+      
+      // After stream completes, check for duplicates if tools were called
+      if (hasToolCalls) {
+        setMessages(prev => {
+          const newMessages = [...prev]
+          
+          // Find messages with same role in the group
+          const assistantMessages = newMessages.filter(m => m.role === 'assistant' && !m.type)
+          
+          if (assistantMessages.length >= 2) {
+            const lastMsg = assistantMessages[assistantMessages.length - 1]
+            const secondLastMsg = assistantMessages[assistantMessages.length - 2]
+            
+            // Check if first 10 words match
+            const getFirst10Words = (text) => text.trim().split(/\s+/).slice(0, 10).join(' ')
+            
+            if (lastMsg.content && secondLastMsg.content) {
+              const lastFirst10 = getFirst10Words(lastMsg.content)
+              const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
+              
+              if (lastFirst10 === secondLastFirst10) {
+                console.log('[nodeFlip] Removing duplicate message before tools')
+                // Remove the second-to-last message (the one before tools)
+                const secondLastIndex = newMessages.indexOf(secondLastMsg)
+                if (secondLastIndex >= 0) {
+                  newMessages.splice(secondLastIndex, 1)
+                }
+              }
+            }
+          }
+          
+          return newMessages
+        })
+      }
+      
     } catch (err) {
       console.error('[nodeFlip] Failed to send message:', err)
       setMessages(prev => [...prev, {
@@ -654,6 +861,26 @@ export const AIBuilder = () => {
       background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       color: '#fff',
     },
+    loadingSpinner: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '16px 20px',
+      fontSize: '14px',
+      color: 'var(--color-text-light, #999)',
+      animation: 'slideIn 0.3s ease-out',
+    },
+    spinnerCircle: {
+      width: '18px',
+      height: '18px',
+      border: '3px solid var(--color-primary, #7C3AED)',
+      borderTopColor: 'transparent',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite',
+    },
+    loadingText: {
+      fontWeight: 500,
+    },
   }
 
   const aiIcon = (
@@ -670,13 +897,24 @@ export const AIBuilder = () => {
   )
 
   return (
-    <div style={styles.container}>
-      <div 
-        style={styles.resizeHandle}
-        onMouseDown={handleMouseDown}
-      >
-        <div style={styles.resizeHoverOverlay} />
-      </div>
+    <>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      
+      <div style={styles.container}>
+        <div 
+          style={styles.resizeHandle}
+          onMouseDown={handleMouseDown}
+        >
+          <div style={styles.resizeHoverOverlay} />
+        </div>
       
       <div style={styles.header}>
         <div style={styles.titleContainer}>
@@ -720,6 +958,15 @@ export const AIBuilder = () => {
         ) : (
           <>
             {renderMessages()}
+            
+            {/* Loading spinner when AI is generating */}
+            {isSending && (
+              <div style={styles.loadingSpinner}>
+                <div style={styles.spinnerCircle} />
+                <span style={styles.loadingText}>AI is thinking...</span>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </>
         )}
@@ -765,6 +1012,7 @@ export const AIBuilder = () => {
         onCommand={handleCommand}
         disabled={isSending || !chatId || !!error || !!pendingApproval} 
       />
-    </div>
+      </div>
+    </>
   )
 }
