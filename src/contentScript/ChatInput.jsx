@@ -122,15 +122,43 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
   }, [closeMenu])
 
   const styles = {
+    wrapper: {
+      background: 'var(--color-background-xlight, #ffffff)',
+      borderTop: 'var(--border-base, 1px solid #e0e0e0)',
+    },
     container: {
       padding: '12px 16px',
-      borderTop: '1px solid var(--color-foreground-base, #e0e0e0)',
       display: 'flex',
       gap: '10px',
       alignItems: 'flex-end',
-      background: 'var(--color-background-xlight, #ffffff)',
-      minHeight: '72px',
+      minHeight: '60px',
       position: 'relative',
+    },
+    creditsBar: {
+      padding: '8px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      fontSize: '12px',
+      color: 'var(--color-text-base, #666)',
+      borderTop: '1px solid var(--color-foreground-xlight, #f0f0f0)',
+    },
+    creditsInfo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+    },
+    creditsText: {
+      fontWeight: 400,
+    },
+    creditsCount: {
+      fontWeight: 600,
+    },
+    getMoreLink: {
+      color: 'var(--color-primary, #7C3AED)',
+      textDecoration: 'none',
+      fontWeight: 500,
+      fontSize: '12px',
     },
     textarea: {
       flex: 1,
@@ -176,52 +204,70 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
   }
 
   return (
-    <div style={styles.container}>
-      {isMenuOpen && filteredCommands.length > 0 && (
-        <CommandMenu
-          commands={filteredCommands}
-          selectedIndex={selectedIndex}
-          onSelect={(command) => selectCommand(command, executeCommand)}
-          onHover={highlightCommand}
-          menuRef={commandMenuRef}
-        />
-      )}
-
-      <textarea
-        ref={textareaRef}
-        style={{
-          ...styles.textarea,
-          ...(isFocused ? styles.textareaFocus : {}),
-        }}
-        placeholder="Ask me to build your workflow..."
-        value={value}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        disabled={disabled}
-        rows={1}
-      />
-      <button
-        style={{
-          ...styles.button,
-          ...(isHovered && !disabled && value.trim() ? styles.buttonHover : {}),
-        }}
-        onClick={handleSubmit}
-        disabled={disabled || !value.trim()}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M5 12l7-7 7 7M12 19V5"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <div style={styles.wrapper}>
+      <div style={styles.container}>
+        {isMenuOpen && filteredCommands.length > 0 && (
+          <CommandMenu
+            commands={filteredCommands}
+            selectedIndex={selectedIndex}
+            onSelect={(command) => selectCommand(command, executeCommand)}
+            onHover={highlightCommand}
+            menuRef={commandMenuRef}
           />
-        </svg>
-      </button>
+        )}
+
+        <textarea
+          ref={textareaRef}
+          style={{
+            ...styles.textarea,
+            ...(isFocused ? styles.textareaFocus : {}),
+          }}
+          placeholder="Ask me to build your workflow..."
+          value={value}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          disabled={disabled}
+          rows={1}
+        />
+        <button
+          style={{
+            ...styles.button,
+            ...(isHovered && !disabled && value.trim() ? styles.buttonHover : {}),
+          }}
+          onClick={handleSubmit}
+          disabled={disabled || !value.trim()}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12l7-7 7 7M12 19V5"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+      
+      <div style={styles.creditsBar}>
+        <div style={styles.creditsInfo}>
+          <span style={styles.creditsText}>
+            <span style={styles.creditsCount}>∞</span> credits available
+          </span>
+        </div>
+        <a 
+          href="https://nodeflip.ai" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={styles.getMoreLink}
+        >
+          About nodeFlip
+        </a>
+      </div>
     </div>
   )
 }

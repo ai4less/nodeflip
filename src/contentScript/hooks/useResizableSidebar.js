@@ -2,7 +2,7 @@ import { useState, useEffect } from 'preact/hooks'
 
 export const useResizableSidebar = ({
   initialWidth = 400,
-  minWidth = 300,
+  minWidth = 400,
   maxWidth = 800,
 } = {}) => {
   const [width, setWidth] = useState(initialWidth)

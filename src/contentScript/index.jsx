@@ -80,16 +80,16 @@ async function injectAIBuilder() {
     injectN8NStoreScript()
     
     // Wait for n8n app to be ready
-    await waitForElement('#n8n-app')
+    const n8nApp = await waitForElement('#n8n-app')
     console.log('[nodeFlip] n8n app found, injecting AI Builder')
 
     // Create sidebar container
     sidebarContainer = document.createElement('div')
     sidebarContainer.id = 'nodeflip-ai-builder'
-    sidebarContainer.style.cssText = 'position: fixed; right: 0; top: 0; bottom: 0; z-index: 9999;'
+    sidebarContainer.style.cssText = 'position: absolute; right: 0; top: 0; bottom: 0; pointer-events: auto; display: none;'
     
-    // Append to body
-    document.body.appendChild(sidebarContainer)
+    // Append to n8n-app div - no style modifications needed
+    n8nApp.appendChild(sidebarContainer)
 
     // Render Preact component
     render(<AIBuilder />, sidebarContainer)

@@ -15,38 +15,41 @@ import { ApprovalBanner } from './components/ApprovalBanner'
 
 const N8N_DELIMITER = '⧉⇋⇋➽⌑⧉§§'
 
-const createContainerStyles = (width, isResizing) => ({
-  container: {
-    position: 'fixed',
+const createContainerStyles = (width, isResizing, isVisible) => ({
+  resizeWrapper: {
+    position: 'absolute',
     right: 0,
     top: 0,
     bottom: 0,
     width: `${width}px`,
-    background: 'var(--color-background-xlight, #ffffff)',
-    boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.15)',
-    display: 'flex',
-    flexDirection: 'column',
-    zIndex: 9999,
-    borderLeft: '1px solid var(--color-foreground-base, #e0e0e0)',
-    fontFamily: 'var(--font-family, system-ui, -apple-system, BlinkMacSystemFont, sans-serif)',
+    zIndex: 'var(--z-index-ask-assistant-chat, 9999)',
   },
-  resizeHandle: {
+  resizer: {
     position: 'absolute',
-    left: 0,
+    zIndex: 3,
+    width: '4px',
+    height: '100%',
     top: 0,
-    bottom: 0,
-    width: '6px',
+    left: 0,
     cursor: 'ew-resize',
     background: isResizing ? 'rgba(151, 51, 238, 0.15)' : 'transparent',
     transition: 'background 0.2s',
-    zIndex: 10,
   },
-  resizeHoverOverlay: {
-    position: 'absolute',
-    left: '-2px',
-    top: 0,
-    bottom: 0,
-    width: '10px',
+  wrapper: {
+    height: '100%',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'relative',
+  },
+  container: {
+    height: '100%',
+    width: '100%',
+    position: 'relative',
+    display: 'grid',
+    gridTemplateRows: 'auto 1fr auto',
+    backgroundColor: 'var(--color-background-light, #f5f5f5)',
+    fontFamily: 'var(--font-family, system-ui, -apple-system, BlinkMacSystemFont, sans-serif)',
   },
 })
 
@@ -62,6 +65,18 @@ export const AIBuilder = () => {
   const messagesEndRef = useRef(null)
 
   const { width, isResizing, handleMouseDown } = useResizableSidebar()
+
+  // Update app-grid margin when width or visibility changes
+  useEffect(() => {
+    const appGrid = document.getElementById('app-grid')
+    if (!appGrid) return
+
+    if (isVisible) {
+      appGrid.style.marginRight = `${width}px`
+    } else {
+      appGrid.style.marginRight = '0'
+    }
+  }, [width, isVisible])
 
   const loadChat = useCallback(async () => {
     try {
@@ -96,6 +111,11 @@ export const AIBuilder = () => {
   const handleToggleSidebar = useCallback(() => {
     setIsVisible(prev => {
       const next = !prev
+      // Update container display
+      const container = document.getElementById('nodeflip-ai-builder')
+      if (container) {
+        container.style.display = next ? 'block' : 'none'
+      }
       if (!prev && !chatId) {
         loadChat()
       }
@@ -564,11 +584,19 @@ export const AIBuilder = () => {
 
   const handleClose = useCallback(() => {
     setIsVisible(false)
+    // Also hide the container element
+    const container = document.getElementById('nodeflip-ai-builder')
+    if (container) {
+      container.style.display = 'none'
+    }
+    // Reset app-grid margin
+    const appGrid = document.getElementById('app-grid')
+    if (appGrid) {
+      appGrid.style.marginRight = '0'
+    }
   }, [])
 
-  if (!isVisible) return null
-
-  const styles = createContainerStyles(width, isResizing)
+  const styles = createContainerStyles(width, isResizing, isVisible)
   const inputDisabled = isSending || !chatId || !!error || !!pendingApproval
   const approvalData = !isSending ? pendingApproval : null
 
@@ -582,33 +610,43 @@ export const AIBuilder = () => {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        /* Hide scrollbars but keep scrolling */
+        [data-scroll-area-viewport] {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        [data-scroll-area-viewport]::-webkit-scrollbar {
+          display: none;
+        }
       `}</style>
 
-      <div style={styles.container}>
-        <div style={styles.resizeHandle} onMouseDown={handleMouseDown}>
-          <div style={styles.resizeHoverOverlay} />
+      <div style={styles.resizeWrapper}>
+        <div style={styles.resizer} onMouseDown={handleMouseDown} />
+        <div style={styles.wrapper}>
+          <div style={styles.container}>
+            <AIBuilderHeader onClose={handleClose} />
+
+            <MessagesPanel
+              messages={messages}
+              isLoading={isLoading}
+              error={error}
+              onRetry={loadChat}
+              isSending={isSending}
+              messagesEndRef={messagesEndRef}
+            />
+
+            {approvalData && (
+              <ApprovalBanner
+                pendingApproval={approvalData}
+                onApprove={handleApprove}
+                onRequestChanges={handleRequestChanges}
+              />
+            )}
+
+            <ChatInput onSend={handleSendMessage} onCommand={handleCommand} disabled={inputDisabled} />
+          </div>
         </div>
-
-        <AIBuilderHeader onClose={handleClose} />
-
-        <MessagesPanel
-          messages={messages}
-          isLoading={isLoading}
-          error={error}
-          onRetry={loadChat}
-          isSending={isSending}
-          messagesEndRef={messagesEndRef}
-        />
-
-        {approvalData && (
-          <ApprovalBanner
-            pendingApproval={approvalData}
-            onApprove={handleApprove}
-            onRequestChanges={handleRequestChanges}
-          />
-        )}
-
-        <ChatInput onSend={handleSendMessage} onCommand={handleCommand} disabled={inputDisabled} />
       </div>
     </>
   )

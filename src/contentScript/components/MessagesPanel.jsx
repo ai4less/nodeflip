@@ -57,13 +57,23 @@ export const MessagesPanel = ({
 }) => {
   const styles = {
     container: {
-      flex: 1,
+      backgroundColor: 'var(--color-background-light, #f5f5f5)',
+      border: 'var(--border-base, 1px solid #e0e0e0)',
+      borderTop: 0,
+      borderBottom: 0,
+      position: 'relative',
       overflowY: 'auto',
       padding: '20px',
       display: 'flex',
       flexDirection: 'column',
       gap: '16px',
-      background: 'var(--color-background-xlight, #fafafa)',
+    },
+    scrollArea: {
+      position: 'relative',
+    },
+    viewport: {
+      overflowY: 'scroll',
+      overflowX: 'hidden',
     },
     loader: {
       textAlign: 'center',
@@ -164,7 +174,7 @@ export const MessagesPanel = ({
   }
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} data-scroll-area-viewport="">
       {renderGroupedMessages(messages)}
       {isSending && (
         <div style={styles.loadingSpinner}>
