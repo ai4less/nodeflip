@@ -63,7 +63,6 @@ const removeOverlay = () => {
   const existingOverlay = document.getElementById(OVERLAY_ID)
   if (existingOverlay) {
     existingOverlay.remove()
-    console.log('[nodeFlip] Removed canvas overlay')
   }
 }
 
@@ -77,7 +76,6 @@ export const useCanvasOverlay = (isActive) => {
       const parent = canvasContainer.parentElement || canvasContainer
       parent.style.position = parent.style.position || 'relative'
       parent.appendChild(overlay)
-      console.log('[nodeFlip] Added canvas overlay for generation')
     } else if (!isActive) {
       removeOverlay()
     }

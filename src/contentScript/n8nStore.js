@@ -415,11 +415,6 @@ if (typeof window !== 'undefined') {
     }
     
     if (message.type === 'n8nStore-addConnection') {
-      console.log('[DEBUG] ========== CONNECTION REQUEST ==========');
-      console.log('[n8nStore] Received addConnection request:', 
-        message.sourceNodeName, '->', message.targetNodeName);
-      console.log('[DEBUG] Message details:', JSON.stringify(message, null, 2));
-      
       try {
         const result = addConnection(
           message.sourceNodeName,
@@ -431,7 +426,6 @@ if (typeof window !== 'undefined') {
         );
         
         if (result) {
-          console.log('[n8nStore] Connection added successfully');
           window.postMessage({
             type: 'n8nStore-response',
             messageId: message.messageId,
@@ -461,8 +455,6 @@ if (typeof window !== 'undefined') {
     if (event.source !== window) return
     
     if (event.data.type === 'nodeflip-extract-catalog') {
-      console.log('[n8nStore] Received catalog extraction request:', event.data.catalogType)
-      
       try {
         // Import catalog extractor functions
         const { extractNodeCatalog, extractStandardNodes, extractCustomNodes } = await import('./catalogExtractor.js')
@@ -476,9 +468,7 @@ if (typeof window !== 'undefined') {
         } else {
           catalog = extractNodeCatalog()
         }
-        
-        console.log(`[n8nStore] Extracted ${catalog.length} ${event.data.catalogType} nodes`)
-        
+
         // Serialize catalog to ensure it can be cloned (remove Vue reactivity)
         const serializedCatalog = JSON.parse(JSON.stringify(catalog))
         

@@ -1,4 +1,3 @@
-
 /**
  * AI Builder Sidebar Component
  * Main component for the nodeFlip AI chat interface
@@ -95,7 +94,7 @@ export const AIBuilder = () => {
   }, [loadChat])
 
   const handleToggleSidebar = useCallback(() => {
-    setIsVisible((prev) => {
+    setIsVisible(prev => {
       const next = !prev
       if (!prev && !chatId) {
         loadChat()
@@ -112,32 +111,35 @@ export const AIBuilder = () => {
 
   useCanvasOverlay(isSending)
 
-  const handleCommand = useCallback(async (commandName) => {
-    console.log('[nodeFlip] Executing command:', commandName)
-
+  const handleCommand = useCallback(async commandName => {
     const commandMsg = {
       role: 'user',
       content: `/${commandName}`,
       timestamp: new Date().toISOString(),
     }
-    setMessages((prev) => [...prev, commandMsg])
+    setMessages(prev => [...prev, commandMsg])
     setIsSending(true)
 
     try {
       if (commandName === 'sync-global-nodes' || commandName === 'sync-custom-nodes') {
         const statusMsg = {
           role: 'assistant',
-          content: `⏳ Extracting ${commandName === 'sync-global-nodes' ? 'standard' : 'custom'} nodes from n8n...`,
+          content: `⏳ Extracting ${
+            commandName === 'sync-global-nodes' ? 'standard' : 'custom'
+          } nodes from n8n...`,
           timestamp: new Date().toISOString(),
         }
-        setMessages((prev) => [...prev, statusMsg])
+        setMessages(prev => [...prev, statusMsg])
 
         const messageId = `${commandName}-${Date.now()}`
         const catalogType = commandName === 'sync-global-nodes' ? 'standard' : 'custom'
 
         const catalogPromise = new Promise((resolve, reject) => {
-          const handler = (event) => {
-            if (event.data.type === 'nodeflip-catalog-response' && event.data.messageId === messageId) {
+          const handler = event => {
+            if (
+              event.data.type === 'nodeflip-catalog-response' &&
+              event.data.messageId === messageId
+            ) {
               window.removeEventListener('message', handler)
               resolve(event.data.catalog)
             }
@@ -149,11 +151,14 @@ export const AIBuilder = () => {
           }, 15000)
         })
 
-        window.postMessage({
-          type: 'nodeflip-extract-catalog',
-          messageId,
-          catalogType,
-        }, '*')
+        window.postMessage(
+          {
+            type: 'nodeflip-extract-catalog',
+            messageId,
+            catalogType,
+          },
+          '*',
+        )
 
         const catalog = await catalogPromise
 
@@ -161,7 +166,7 @@ export const AIBuilder = () => {
           throw new Error('No nodes found. Make sure n8n is fully loaded.')
         }
 
-        setMessages((prev) => {
+        setMessages(prev => {
           const nextMessages = [...prev]
           nextMessages[nextMessages.length - 1] = {
             ...nextMessages[nextMessages.length - 1],
@@ -190,7 +195,7 @@ export const AIBuilder = () => {
 
         const result = await response.json()
 
-        setMessages((prev) => {
+        setMessages(prev => {
           const nextMessages = [...prev]
           nextMessages[nextMessages.length - 1] = {
             ...nextMessages[nextMessages.length - 1],
@@ -201,7 +206,7 @@ export const AIBuilder = () => {
       }
     } catch (error) {
       console.error('[nodeFlip] Command failed:', error)
-      setMessages((prev) => {
+      setMessages(prev => {
         const nextMessages = [...prev]
         nextMessages[nextMessages.length - 1] = {
           role: 'error',
@@ -215,314 +220,336 @@ export const AIBuilder = () => {
     }
   }, [])
 
-  const handleSendMessage = useCallback(async (text) => {
-    if (!chatId || isSending) return
+  const handleSendMessage = useCallback(
+    async text => {
+      if (!chatId || isSending) return
 
-    try {
-      setIsSending(true)
-      setError(null)
+      try {
+        setIsSending(true)
+        setError(null)
 
-      const userMessage = {
-        role: 'user',
-        content: text,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, userMessage])
+        const userMessage = {
+          role: 'user',
+          content: text,
+          timestamp: new Date().toISOString(),
+        }
+        setMessages(prev => [...prev, userMessage])
 
-      const api = apiRef.current
-      const stream = await api.sendMessage(chatId, text)
+        const api = apiRef.current
+        const stream = await api.sendMessage(chatId, text)
 
-      const reader = stream.getReader()
-      const decoder = new TextDecoder()
-      const assistantMessage = {
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString(),
-      }
+        const reader = stream.getReader()
+        const decoder = new TextDecoder()
+        const assistantMessage = {
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+        }
 
-      setMessages((prev) => [...prev, assistantMessage])
+        setMessages(prev => [...prev, assistantMessage])
 
-      let buffer = ''
-      let hasToolCalls = false
+        let buffer = ''
+        let hasToolCalls = false
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        buffer += decoder.decode(value, { stream: true })
-        const messageParts = buffer.split(N8N_DELIMITER)
-        buffer = messageParts.pop() || ''
+          buffer += decoder.decode(value, { stream: true })
+          const messageParts = buffer.split(N8N_DELIMITER)
+          buffer = messageParts.pop() || ''
 
-        for (const part of messageParts) {
-          if (!part.trim()) continue
+          for (const part of messageParts) {
+            if (!part.trim()) continue
 
-          try {
-            const parsed = JSON.parse(part)
-            const streamedMessages = parsed.messages || []
+            try {
+              const parsed = JSON.parse(part)
+              const streamedMessages = parsed.messages || []
 
-            for (const msg of streamedMessages) {
-              if (msg.type === 'tool') {
-                hasToolCalls = true
+              for (const msg of streamedMessages) {
+                if (msg.type === 'tool') {
+                  hasToolCalls = true
 
-                const toolMessage = {
-                  role: 'assistant',
-                  type: 'tool',
-                  toolName: msg.toolName || msg.displayTitle || 'Processing',
-                  toolCallId: msg.toolCallId,
-                  status: msg.status || 'running',
-                  timestamp: new Date().toISOString(),
-                }
-
-                setMessages((prev) => {
-                  const existingIndex = prev.findIndex(
-                    (item) => item.type === 'tool' && item.toolCallId === msg.toolCallId,
-                  )
-
-                  if (existingIndex >= 0) {
-                    const nextMessages = [...prev]
-                    nextMessages[existingIndex] = { ...nextMessages[existingIndex], status: msg.status }
-                    return nextMessages
+                  const toolMessage = {
+                    role: 'assistant',
+                    type: 'tool',
+                    toolName: msg.toolName || msg.displayTitle || 'Processing',
+                    toolCallId: msg.toolCallId,
+                    status: msg.status || 'running',
+                    timestamp: new Date().toISOString(),
                   }
 
-                  return [...prev, toolMessage]
-                })
-              } else if (msg.type === 'message' && msg.text) {
-                assistantMessage.content += msg.text
+                  setMessages(prev => {
+                    const existingIndex = prev.findIndex(
+                      item => item.type === 'tool' && item.toolCallId === msg.toolCallId,
+                    )
 
-                setMessages((prev) => {
-                  const nextMessages = [...prev]
-                  nextMessages[nextMessages.length - 1] = { ...assistantMessage }
+                    if (existingIndex >= 0) {
+                      const nextMessages = [...prev]
+                      nextMessages[existingIndex] = {
+                        ...nextMessages[existingIndex],
+                        status: msg.status,
+                      }
+                      return nextMessages
+                    }
 
-                  if (hasToolCalls) {
-                    const assistantMessages = nextMessages.filter((item) => item.role === 'assistant' && !item.type)
+                    return [...prev, toolMessage]
+                  })
+                } else if (msg.type === 'message' && msg.text) {
+                  assistantMessage.content += msg.text
 
-                    if (assistantMessages.length >= 2) {
-                      const lastMsg = assistantMessages[assistantMessages.length - 1]
-                      const secondLastMsg = assistantMessages[assistantMessages.length - 2]
+                  setMessages(prev => {
+                    const nextMessages = [...prev]
+                    nextMessages[nextMessages.length - 1] = { ...assistantMessage }
 
-                      const getFirst10Words = (value) => value.trim().split(/\s+/).slice(0, 10).join(' ')
+                    if (hasToolCalls) {
+                      const assistantMessages = nextMessages.filter(
+                        item => item.role === 'assistant' && !item.type,
+                      )
 
-                      if (lastMsg.content && secondLastMsg.content) {
-                        const lastFirst10 = getFirst10Words(lastMsg.content)
-                        const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
+                      if (assistantMessages.length >= 2) {
+                        const lastMsg = assistantMessages[assistantMessages.length - 1]
+                        const secondLastMsg = assistantMessages[assistantMessages.length - 2]
 
-                        if (lastFirst10 === secondLastFirst10) {
-                          const secondLastIndex = nextMessages.indexOf(secondLastMsg)
-                          if (secondLastIndex >= 0) {
-                            nextMessages.splice(secondLastIndex, 1)
+                        const getFirst10Words = value =>
+                          value.trim().split(/\s+/).slice(0, 10).join(' ')
+
+                        if (lastMsg.content && secondLastMsg.content) {
+                          const lastFirst10 = getFirst10Words(lastMsg.content)
+                          const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
+
+                          if (lastFirst10 === secondLastFirst10) {
+                            const secondLastIndex = nextMessages.indexOf(secondLastMsg)
+                            if (secondLastIndex >= 0) {
+                              nextMessages.splice(secondLastIndex, 1)
+                            }
                           }
                         }
                       }
                     }
+
+                    return nextMessages
+                  })
+                } else if (msg.type === 'node_suggestion' && msg.data) {
+                  if (msg.data.node) {
+                    try {
+                      const addNodePromise = new Promise((resolve, reject) => {
+                        const messageId = `add-node-${Date.now()}`
+
+                        const handleResponse = event => {
+                          if (
+                            event.data?.type === 'n8nStore-response' &&
+                            event.data.messageId === messageId
+                          ) {
+                            window.removeEventListener('message', handleResponse)
+                            if (event.data.success) {
+                              resolve(event.data.result)
+                            } else {
+                              reject(new Error(event.data.error || 'Failed to add node'))
+                            }
+                          }
+                        }
+
+                        window.addEventListener('message', handleResponse)
+
+                        const nodeConfig = JSON.parse(JSON.stringify(msg.data.node))
+
+                        window.postMessage(
+                          {
+                            type: 'n8nStore-addNode',
+                            messageId,
+                            nodeConfig,
+                            previousNodeName: msg.data.previousNode || null,
+                          },
+                          '*',
+                        )
+
+                        setTimeout(() => {
+                          window.removeEventListener('message', handleResponse)
+                          reject(new Error('Timeout waiting for node addition'))
+                        }, 5000)
+                      })
+
+                      await addNodePromise
+
+                      if (msg.data.previousNode) {
+                        try {
+                          await new Promise(resolve => setTimeout(resolve, 500))
+
+                          const connectionPromise = new Promise((resolve, reject) => {
+                            const messageId = `add-connection-${Date.now()}`
+
+                            const handleResponse = event => {
+                              if (
+                                event.data?.type === 'n8nStore-response' &&
+                                event.data.messageId === messageId
+                              ) {
+                                window.removeEventListener('message', handleResponse)
+                                if (event.data.success) {
+                                  resolve(event.data.result)
+                                } else {
+                                  reject(new Error(event.data.error || 'Failed to add connection'))
+                                }
+                              }
+                            }
+
+                            window.addEventListener('message', handleResponse)
+
+                            window.postMessage(
+                              {
+                                type: 'n8nStore-addConnection',
+                                messageId,
+                                sourceNodeName: msg.data.previousNode,
+                                targetNodeName: msg.data.node.name,
+                                sourceOutputType: 'main',
+                                targetInputType: 'main',
+                                sourceOutputIndex: 0,
+                                targetInputIndex: 0,
+                              },
+                              '*',
+                            )
+
+                            setTimeout(() => {
+                              window.removeEventListener('message', handleResponse)
+                              reject(new Error('Timeout waiting for connection'))
+                            }, 5000)
+                          })
+
+                          await connectionPromise
+                        } catch (error) {
+                          console.error('[nodeFlip] Failed to create connection:', error)
+                        }
+                      }
+
+                      setPendingApproval({
+                        nodeName: msg.data.node.name,
+                        nodeType: msg.data.node.type,
+                      })
+
+                      if (msg.data.chat_message) {
+                        assistantMessage.content += msg.data.chat_message
+                      }
+                    } catch (error) {
+                      console.error('[nodeFlip] Failed to add node:', error)
+                      assistantMessage.content += `
+
+⚠️ Failed to add node: ${error.message}`
+                    }
+                  } else if (msg.data.chat_message) {
+                    assistantMessage.content += msg.data.chat_message
                   }
 
-                  return nextMessages
-                })
-              } else if (msg.type === 'node_suggestion' && msg.data) {
-                console.log('[DEBUG] Node suggestion received:', {
-                  nodeName: msg.data.node?.name,
-                  previousNode: msg.data.previousNode,
-                  hasPreviousNode: !!msg.data.previousNode,
-                })
-
-                if (msg.data.node) {
+                  setMessages(prev => {
+                    const nextMessages = [...prev]
+                    nextMessages[nextMessages.length - 1] = { ...assistantMessage }
+                    return nextMessages
+                  })
+                } else if (msg.type === 'node_update' && msg.data) {
                   try {
-                    console.log('[nodeFlip] Received node suggestion:', msg.data.node)
-                    console.log('[nodeFlip] Node parameters:', JSON.stringify(msg.data.node.parameters, null, 2))
+                    const updateNodePromise = new Promise((resolve, reject) => {
+                      const messageId = `update-node-${Date.now()}`
 
-                    const addNodePromise = new Promise((resolve, reject) => {
-                      const messageId = `add-node-${Date.now()}`
-
-                      const handleResponse = (event) => {
-                        if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
+                      const handleResponse = event => {
+                        if (
+                          event.data?.type === 'n8nStore-response' &&
+                          event.data.messageId === messageId
+                        ) {
                           window.removeEventListener('message', handleResponse)
                           if (event.data.success) {
                             resolve(event.data.result)
                           } else {
-                            reject(new Error(event.data.error || 'Failed to add node'))
+                            reject(new Error(event.data.error || 'Failed to update node'))
                           }
                         }
                       }
 
                       window.addEventListener('message', handleResponse)
 
-                      window.postMessage({
-                        type: 'n8nStore-addNode',
-                        messageId,
-                        nodeConfig: JSON.parse(JSON.stringify(msg.data.node)),
-                      }, '*')
+                      window.postMessage(
+                        {
+                          type: 'n8nStore-updateNode',
+                          messageId,
+                          nodeName: msg.data.nodeName,
+                          parameters: msg.data.parameters,
+                        },
+                        '*',
+                      )
 
                       setTimeout(() => {
                         window.removeEventListener('message', handleResponse)
-                        reject(new Error('Timeout waiting for node addition'))
+                        reject(new Error('Timeout waiting for node update'))
                       }, 5000)
                     })
 
-                    await addNodePromise
-                    console.log('[nodeFlip] Node added successfully')
-
-                    if (msg.data.previousNode) {
-                      console.log(`[nodeFlip] Auto-connecting: ${msg.data.previousNode} → ${msg.data.node.name}`)
-
-                      try {
-                        await new Promise((resolve) => setTimeout(resolve, 500))
-
-                        const connectionPromise = new Promise((resolve, reject) => {
-                          const messageId = `add-connection-${Date.now()}`
-
-                          const handleResponse = (event) => {
-                            if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
-                              window.removeEventListener('message', handleResponse)
-                              if (event.data.success) {
-                                resolve(event.data.result)
-                              } else {
-                                reject(new Error(event.data.error || 'Failed to add connection'))
-                              }
-                            }
-                          }
-
-                          window.addEventListener('message', handleResponse)
-
-                          window.postMessage({
-                            type: 'n8nStore-addConnection',
-                            messageId,
-                            sourceNodeName: msg.data.previousNode,
-                            targetNodeName: msg.data.node.name,
-                            sourceOutputType: 'main',
-                            targetInputType: 'main',
-                            sourceOutputIndex: 0,
-                            targetInputIndex: 0,
-                          }, '*')
-
-                          setTimeout(() => {
-                            window.removeEventListener('message', handleResponse)
-                            reject(new Error('Timeout waiting for connection'))
-                          }, 5000)
-                        })
-
-                        await connectionPromise
-                        console.log(`[nodeFlip] Connection created: ${msg.data.previousNode} → ${msg.data.node.name}`)
-                      } catch (error) {
-                        console.error('[nodeFlip] Failed to create connection:', error)
-                      }
-                    }
-
-                    setPendingApproval({
-                      nodeName: msg.data.node.name,
-                      nodeType: msg.data.node.type,
-                    })
-
-                    if (msg.data.chat_message) {
-                      assistantMessage.content += msg.data.chat_message
-                    }
+                    await updateNodePromise
                   } catch (error) {
-                    console.error('[nodeFlip] Failed to add node:', error)
+                    console.error('[nodeFlip] Failed to update node:', error)
                     assistantMessage.content += `
 
-⚠️ Failed to add node: ${error.message}`
-                  }
-                } else if (msg.data.chat_message) {
-                  assistantMessage.content += msg.data.chat_message
-                }
-
-                setMessages((prev) => {
-                  const nextMessages = [...prev]
-                  nextMessages[nextMessages.length - 1] = { ...assistantMessage }
-                  return nextMessages
-                })
-              } else if (msg.type === 'node_update' && msg.data) {
-                console.log('[nodeFlip] Received node update:', msg.data.nodeName, msg.data.parameters)
-
-                try {
-                  const updateNodePromise = new Promise((resolve, reject) => {
-                    const messageId = `update-node-${Date.now()}`
-
-                    const handleResponse = (event) => {
-                      if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
-                        window.removeEventListener('message', handleResponse)
-                        if (event.data.success) {
-                          resolve(event.data.result)
-                        } else {
-                          reject(new Error(event.data.error || 'Failed to update node'))
-                        }
-                      }
-                    }
-
-                    window.addEventListener('message', handleResponse)
-
-                    window.postMessage({
-                      type: 'n8nStore-updateNode',
-                      messageId,
-                      nodeName: msg.data.nodeName,
-                      parameters: msg.data.parameters,
-                    }, '*')
-
-                    setTimeout(() => {
-                      window.removeEventListener('message', handleResponse)
-                      reject(new Error('Timeout waiting for node update'))
-                    }, 5000)
-                  })
-
-                  await updateNodePromise
-                  console.log('[nodeFlip] Node updated successfully')
-                } catch (error) {
-                  console.error('[nodeFlip] Failed to update node:', error)
-                  assistantMessage.content += `
-
 ⚠️ Failed to update node: ${error.message}`
+                  }
                 }
               }
+            } catch (parseError) {
+              console.warn('[nodeFlip] Failed to parse n8n message:', parseError, part)
             }
-          } catch (parseError) {
-            console.warn('[nodeFlip] Failed to parse n8n message:', parseError, part)
           }
         }
-      }
 
-      if (hasToolCalls) {
-        setMessages((prev) => {
-          const nextMessages = [...prev]
-          const assistantMessages = nextMessages.filter((item) => item.role === 'assistant' && !item.type)
+        if (hasToolCalls) {
+          setMessages(prev => {
+            const nextMessages = [...prev]
+            const assistantMessages = nextMessages.filter(
+              item => item.role === 'assistant' && !item.type,
+            )
 
-          if (assistantMessages.length >= 2) {
-            const lastMsg = assistantMessages[assistantMessages.length - 1]
-            const secondLastMsg = assistantMessages[assistantMessages.length - 2]
+            if (assistantMessages.length >= 2) {
+              const lastMsg = assistantMessages[assistantMessages.length - 1]
+              const secondLastMsg = assistantMessages[assistantMessages.length - 2]
 
-            const getFirst10Words = (value) => value.trim().split(/\s+/).slice(0, 10).join(' ')
+              const getFirst10Words = value => value.trim().split(/\s+/).slice(0, 10).join(' ')
 
-            if (lastMsg.content && secondLastMsg.content) {
-              const lastFirst10 = getFirst10Words(lastMsg.content)
-              const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
+              if (lastMsg.content && secondLastMsg.content) {
+                const lastFirst10 = getFirst10Words(lastMsg.content)
+                const secondLastFirst10 = getFirst10Words(secondLastMsg.content)
 
-              if (lastFirst10 === secondLastFirst10) {
-                const secondLastIndex = nextMessages.indexOf(secondLastMsg)
-                if (secondLastIndex >= 0) {
-                  nextMessages.splice(secondLastIndex, 1)
+                if (lastFirst10 === secondLastFirst10) {
+                  const secondLastIndex = nextMessages.indexOf(secondLastMsg)
+                  if (secondLastIndex >= 0) {
+                    nextMessages.splice(secondLastIndex, 1)
+                  }
                 }
               }
             }
-          }
 
-          return nextMessages
-        })
+            return nextMessages
+          })
+        }
+      } catch (err) {
+        console.error('[nodeFlip] Failed to send message:', err)
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'error',
+            content: 'Failed to send message. Please check your connection and try again.',
+            timestamp: new Date().toISOString(),
+          },
+        ])
+      } finally {
+        setIsSending(false)
       }
-    } catch (err) {
-      console.error('[nodeFlip] Failed to send message:', err)
-      setMessages((prev) => [...prev, {
-        role: 'error',
-        content: 'Failed to send message. Please check your connection and try again.',
-        timestamp: new Date().toISOString(),
-      }])
-    } finally {
-      setIsSending(false)
-    }
-  }, [chatId, isSending])
+    },
+    [chatId, isSending],
+  )
 
-  const handleApprovalDecision = useCallback(async (approved, customMessage = null) => {
-    setPendingApproval(null)
-    const message = customMessage || (approved ? 'yes' : 'no')
-    await handleSendMessage(message)
-  }, [handleSendMessage])
+  const handleApprovalDecision = useCallback(
+    async (approved, customMessage = null) => {
+      setPendingApproval(null)
+      const message = customMessage || (approved ? 'yes' : 'no')
+      await handleSendMessage(message)
+    },
+    [handleSendMessage],
+  )
 
   const handleApprove = useCallback(() => {
     handleApprovalDecision(true)
@@ -558,10 +585,7 @@ export const AIBuilder = () => {
       `}</style>
 
       <div style={styles.container}>
-        <div
-          style={styles.resizeHandle}
-          onMouseDown={handleMouseDown}
-        >
+        <div style={styles.resizeHandle} onMouseDown={handleMouseDown}>
           <div style={styles.resizeHoverOverlay} />
         </div>
 
@@ -584,11 +608,7 @@ export const AIBuilder = () => {
           />
         )}
 
-        <ChatInput
-          onSend={handleSendMessage}
-          onCommand={handleCommand}
-          disabled={inputDisabled}
-        />
+        <ChatInput onSend={handleSendMessage} onCommand={handleCommand} disabled={inputDisabled} />
       </div>
     </>
   )
