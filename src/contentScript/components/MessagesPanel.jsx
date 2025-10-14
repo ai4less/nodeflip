@@ -36,11 +36,7 @@ const renderGroupedMessages = (messages = []) => {
 
   if (currentGroup.length > 0) {
     rendered.push(
-      <MessageGroup
-        key="group-final"
-        messages={currentGroup}
-        showHeader={showGroupHeader}
-      />,
+      <MessageGroup key="group-final" messages={currentGroup} showHeader={showGroupHeader} />,
     )
   }
 
@@ -165,7 +161,7 @@ export const MessagesPanel = ({
       <div style={styles.container}>
         <div style={styles.placeholder}>
           <div style={styles.placeholderTitle}>👋</div>
-          <div style={styles.placeholderText}>Hi! I'm nodeFlip AI</div>
+          <div style={styles.placeholderText}>Welcome to NodeFlip</div>
           <div style={styles.placeholderText}>I can help you build n8n workflows.</div>
           <div style={styles.placeholderText}>What would you like to create today?</div>
         </div>
