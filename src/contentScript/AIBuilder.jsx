@@ -61,6 +61,7 @@ export const AIBuilder = () => {
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState(null)
   const [pendingApproval, setPendingApproval] = useState(null)
+  const [lastAddedNodeName, setLastAddedNodeName] = useState(null)
   const apiRef = useRef(new AIBuilderAPI())
   const messagesEndRef = useRef(null)
 
@@ -94,8 +95,21 @@ export const AIBuilder = () => {
       const id = await api.getChatOrCreate()
       setChatId(id)
 
-      const loadedMessages = await api.getMessages(id)
-      setMessages(loadedMessages)
+      // Don't load messages from backend - we manage history in frontend
+      // Load from local storage instead
+      try {
+        const savedState = await chrome.storage.local.get(['chatMessages', 'lastAddedNodeName'])
+        if (savedState.chatMessages && Array.isArray(savedState.chatMessages)) {
+          setMessages(savedState.chatMessages)
+        } else {
+          setMessages([])
+        }
+        setLastAddedNodeName(savedState.lastAddedNodeName || null)
+      } catch (storageError) {
+        console.warn('[nodeFlip] Could not load from storage (extension context may be invalid):', storageError)
+        setMessages([])
+        setLastAddedNodeName(null)
+      }
     } catch (err) {
       console.error('[nodeFlip] Failed to load chat:', err)
       
@@ -135,7 +149,23 @@ export const AIBuilder = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    
+    // Save messages to local storage whenever they change
+    if (messages.length > 0 && typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.set({ chatMessages: messages }).catch(err => {
+        console.warn('[nodeFlip] Failed to save messages (extension context may be invalid):', err)
+      })
+    }
   }, [messages])
+  
+  // Save lastAddedNodeName to local storage whenever it changes
+  useEffect(() => {
+    if (chatId && typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.local.set({ lastAddedNodeName }).catch(err => {
+        console.warn('[nodeFlip] Failed to save lastAddedNodeName (extension context may be invalid):', err)
+      })
+    }
+  }, [lastAddedNodeName, chatId])
 
   useCanvasOverlay(isSending)
 
@@ -264,7 +294,7 @@ export const AIBuilder = () => {
         setMessages(prev => [...prev, userMessage])
 
         const api = apiRef.current
-        const stream = await api.sendMessage(chatId, text)
+        const stream = await api.sendMessage(chatId, text, messages, lastAddedNodeName)
 
         const reader = stream.getReader()
         const decoder = new TextDecoder()
@@ -399,6 +429,9 @@ export const AIBuilder = () => {
                       })
 
                       await addNodePromise
+                      
+                      // Track the node that was just added
+                      setLastAddedNodeName(msg.data.node.name)
 
                       if (msg.data.previousNode) {
                         try {
@@ -606,12 +639,19 @@ export const AIBuilder = () => {
 
   const handleNewChat = useCallback(async () => {
     // Clear chat data from storage
-    await chrome.storage.local.remove(['chatMessages', 'chatId'])
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        await chrome.storage.local.remove(['chatMessages', 'chatId', 'lastAddedNodeName'])
+      }
+    } catch (err) {
+      console.warn('[nodeFlip] Failed to clear storage:', err)
+    }
     
     // Reset state
     setChatId(null)
     setMessages([])
     setPendingApproval(null)
+    setLastAddedNodeName(null)
     
     // Load new chat
     await loadChat()

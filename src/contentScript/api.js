@@ -13,14 +13,28 @@ export class AIBuilderAPI {
    * Always fetches fresh config from storage to ensure latest values
    */
   async getConfig() {
-    return new Promise((resolve) => {
-      chrome.storage.sync.get(['backendUrl', 'apiKey'], (data) => {
-        this.config = {
-          backendUrl: data.backendUrl || '',
-          apiKey: data.apiKey || ''
-        }
-        resolve(this.config)
-      })
+    return new Promise((resolve, reject) => {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        reject(new Error('Extension context invalidated. Please reload the page.'))
+        return
+      }
+      
+      try {
+        chrome.storage.sync.get(['backendUrl', 'apiKey'], (data) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          
+          this.config = {
+            backendUrl: data.backendUrl || '',
+            apiKey: data.apiKey || ''
+          }
+          resolve(this.config)
+        })
+      } catch (error) {
+        reject(new Error('Extension context invalidated. Please reload the page.'))
+      }
     })
   }
 
@@ -129,8 +143,51 @@ export class AIBuilderAPI {
   /**
    * Send a message and get streaming response
    */
-  async sendMessage(chatId, message) {
+  async sendMessage(chatId, message, conversationHistory = [], lastAddedNodeName = null) {
     const config = await this.getConfig()
+    
+    // Get current workflow state from n8n canvas
+    let workflowNodes = []
+    let workflowConnections = {}
+    
+    try {
+      // Try to get current workflow from n8n store
+      const { getCurrentWorkflow } = await import('./n8nStore.js')
+      const workflow = getCurrentWorkflow()
+      
+      if (workflow && !workflow.error) {
+        workflowNodes = workflow.nodes || []
+        workflowConnections = workflow.connections || {}
+      } else if (workflow && workflow.error) {
+        // n8n not fully loaded yet, send empty workflow (backend will know it's empty)
+        console.log('[nodeFlip] n8n store not available yet, sending empty workflow state')
+      }
+    } catch (error) {
+      // Silent fail - just send empty workflow state
+      console.log('[nodeFlip] Could not access n8n store, sending empty workflow state')
+    }
+    
+    // Convert frontend message format to backend format
+    // Only include messages with actual content (skip tool status messages and empty messages)
+    const backendHistory = conversationHistory
+      .filter(msg => {
+        // Skip tool status messages
+        if (msg.type === 'tool') return false
+        // Skip messages without content
+        if (!msg.content || msg.content.trim() === '') return false
+        // Skip error messages
+        if (msg.role === 'error') return false
+        return true
+      })
+      .map(msg => {
+        if (msg.role === 'user') {
+          return { role: 'user', content: msg.content }
+        } else if (msg.role === 'assistant') {
+          return { role: 'assistant', content: msg.content }
+        }
+        return null
+      })
+      .filter(msg => msg !== null)
     
     const response = await fetch(
       `${config.backendUrl}/api/v1/llm-chats/${chatId}/stream`,
@@ -141,8 +198,19 @@ export class AIBuilderAPI {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          content: message,
-          node_catalog: [] // Empty for now, can be populated later
+          payload: {
+            role: 'user',
+            type: 'message',
+            text: message,
+            workflowContext: {
+              currentWorkflow: {
+                nodes: workflowNodes,
+                connections: workflowConnections
+              },
+              conversationHistory: backendHistory,
+              lastAddedNodeName: lastAddedNodeName
+            }
+          }
         })
       }
     )
