@@ -9,6 +9,37 @@ export class AIBuilderAPI {
   }
 
   /**
+   * Get remaining quota for the API key
+   */
+  async getQuota() {
+    try {
+      const config = await this.getConfig()
+      
+      if (!config.backendUrl || !config.apiKey) {
+        throw new Error('Backend URL or API key not configured')
+      }
+
+      const response = await fetch(`${config.backendUrl}/api/v1/api-keys/quota`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to fetch quota' }))
+        throw new Error(error.detail || 'Failed to fetch quota')
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('[nodeFlip API] Failed to fetch quota:', error)
+      throw error
+    }
+  }
+
+  /**
    * Get configuration from chrome.storage.sync
    * Always fetches fresh config from storage to ensure latest values
    */
@@ -143,29 +174,12 @@ export class AIBuilderAPI {
   /**
    * Send a message and get streaming response
    */
-  async sendMessage(chatId, message, conversationHistory = [], lastAddedNodeName = null) {
+  async sendMessage(chatId, message, conversationHistory = [], lastAddedNodeName = null, addedNodes = []) {
     const config = await this.getConfig()
     
-    // Get current workflow state from n8n canvas
-    let workflowNodes = []
-    let workflowConnections = {}
-    
-    try {
-      // Try to get current workflow from n8n store
-      const { getCurrentWorkflow } = await import('./n8nStore.js')
-      const workflow = getCurrentWorkflow()
-      
-      if (workflow && !workflow.error) {
-        workflowNodes = workflow.nodes || []
-        workflowConnections = workflow.connections || {}
-      } else if (workflow && workflow.error) {
-        // n8n not fully loaded yet, send empty workflow (backend will know it's empty)
-        console.log('[nodeFlip] n8n store not available yet, sending empty workflow state')
-      }
-    } catch (error) {
-      // Silent fail - just send empty workflow state
-      console.log('[nodeFlip] Could not access n8n store, sending empty workflow state')
-    }
+    // Use the nodes we've tracked in frontend state (no need to query n8n canvas)
+    const workflowNodes = addedNodes
+    const workflowConnections = {} // We don't track connections, not needed for duplicate prevention
     
     // Convert frontend message format to backend format
     // Only include messages with actual content (skip tool status messages and empty messages)

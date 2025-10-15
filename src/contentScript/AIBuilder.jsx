@@ -62,6 +62,8 @@ export const AIBuilder = () => {
   const [error, setError] = useState(null)
   const [pendingApproval, setPendingApproval] = useState(null)
   const [lastAddedNodeName, setLastAddedNodeName] = useState(null)
+  const [remainingNodes, setRemainingNodes] = useState(null)
+  const [addedNodes, setAddedNodes] = useState([]) // Track nodes we've added
   const apiRef = useRef(new AIBuilderAPI())
   const messagesEndRef = useRef(null)
 
@@ -98,17 +100,38 @@ export const AIBuilder = () => {
       // Don't load messages from backend - we manage history in frontend
       // Load from local storage instead
       try {
-        const savedState = await chrome.storage.local.get(['chatMessages', 'lastAddedNodeName'])
+        const savedState = await chrome.storage.local.get(['chatMessages', 'lastAddedNodeName', 'remainingNodes'])
         if (savedState.chatMessages && Array.isArray(savedState.chatMessages)) {
           setMessages(savedState.chatMessages)
         } else {
           setMessages([])
         }
         setLastAddedNodeName(savedState.lastAddedNodeName || null)
+        setRemainingNodes(savedState.remainingNodes ?? null)
       } catch (storageError) {
         console.warn('[nodeFlip] Could not load from storage (extension context may be invalid):', storageError)
         setMessages([])
         setLastAddedNodeName(null)
+        setRemainingNodes(null)
+      }
+
+      // Fetch fresh quota from backend
+      try {
+        const quota = await apiRef.current.getQuota()
+        console.log('[nodeFlip] Fetched quota:', quota)
+        console.log('[nodeFlip] Setting remainingNodes to:', quota.remaining_nodes)
+        setRemainingNodes(quota.remaining_nodes)
+        
+        // Also persist to storage
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+          chrome.storage.local.set({ remainingNodes: quota.remaining_nodes }).catch(err => {
+            console.warn('[nodeFlip] Failed to save quota to storage:', err)
+          })
+        }
+      } catch (quotaError) {
+        console.warn('[nodeFlip] Could not fetch quota:', quotaError)
+        // Set to null to show "Unlimited" on error
+        setRemainingNodes(null)
       }
     } catch (err) {
       console.error('[nodeFlip] Failed to load chat:', err)
@@ -158,14 +181,14 @@ export const AIBuilder = () => {
     }
   }, [messages])
   
-  // Save lastAddedNodeName to local storage whenever it changes
+  // Save lastAddedNodeName and remainingNodes to local storage whenever they change
   useEffect(() => {
     if (chatId && typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.set({ lastAddedNodeName }).catch(err => {
-        console.warn('[nodeFlip] Failed to save lastAddedNodeName (extension context may be invalid):', err)
+      chrome.storage.local.set({ lastAddedNodeName, remainingNodes }).catch(err => {
+        console.warn('[nodeFlip] Failed to save to storage (extension context may be invalid):', err)
       })
     }
-  }, [lastAddedNodeName, chatId])
+  }, [lastAddedNodeName, remainingNodes, chatId])
 
   useCanvasOverlay(isSending)
 
@@ -294,7 +317,7 @@ export const AIBuilder = () => {
         setMessages(prev => [...prev, userMessage])
 
         const api = apiRef.current
-        const stream = await api.sendMessage(chatId, text, messages, lastAddedNodeName)
+        const stream = await api.sendMessage(chatId, text, messages, lastAddedNodeName, addedNodes)
 
         const reader = stream.getReader()
         const decoder = new TextDecoder()
@@ -432,6 +455,21 @@ export const AIBuilder = () => {
                       
                       // Track the node that was just added
                       setLastAddedNodeName(msg.data.node.name)
+                      
+                      // Track this node in our state
+                      setAddedNodes(prev => [...prev, {
+                        name: msg.data.node.name,
+                        type: msg.data.node.type
+                      }])
+                      
+                      // Fetch fresh quota after node is added
+                      try {
+                        const quota = await apiRef.current.getQuota()
+                        console.log('[nodeFlip] Updated quota after node addition:', quota)
+                        setRemainingNodes(quota.remaining_nodes)
+                      } catch (quotaError) {
+                        console.warn('[nodeFlip] Could not fetch updated quota:', quotaError)
+                      }
 
                       if (msg.data.previousNode) {
                         try {
@@ -641,7 +679,7 @@ export const AIBuilder = () => {
     // Clear chat data from storage
     try {
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        await chrome.storage.local.remove(['chatMessages', 'chatId', 'lastAddedNodeName'])
+        await chrome.storage.local.remove(['chatMessages', 'chatId', 'lastAddedNodeName', 'remainingNodes'])
       }
     } catch (err) {
       console.warn('[nodeFlip] Failed to clear storage:', err)
@@ -652,6 +690,8 @@ export const AIBuilder = () => {
     setMessages([])
     setPendingApproval(null)
     setLastAddedNodeName(null)
+    setRemainingNodes(null)
+    setAddedNodes([]) // Clear tracked nodes
     
     // Load new chat
     await loadChat()
@@ -705,7 +745,12 @@ export const AIBuilder = () => {
               />
             )}
 
-            <ChatInput onSend={handleSendMessage} onCommand={handleCommand} disabled={inputDisabled} />
+            <ChatInput 
+              onSend={handleSendMessage} 
+              onCommand={handleCommand} 
+              disabled={inputDisabled}
+              remainingNodes={remainingNodes}
+            />
           </div>
         </div>
       </div>

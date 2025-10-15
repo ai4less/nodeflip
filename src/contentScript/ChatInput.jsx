@@ -21,7 +21,7 @@ const COMMANDS = [
   },
 ]
 
-export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
+export const ChatInput = ({ onSend, onCommand, disabled = false, remainingNodes = null }) => {
   const [value, setValue] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -152,7 +152,7 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
       background: 'var(--color-background-xlight, #ffffff)',
       position: 'relative',
       height: `${height}px`,
-      minHeight: '60px',
+      minHeight: '100px',
       maxHeight: '400px',
     },
     resizeHandle: {
@@ -167,39 +167,27 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
       zIndex: 10,
     },
     container: {
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      overflow: 'auto',
+    },
+    inputContainer: {
       padding: '12px 16px',
       display: 'flex',
       gap: '10px',
       alignItems: 'flex-end',
-      height: '100%',
-      position: 'relative',
-      overflow: 'auto',
+      flex: 1,
     },
     creditsBar: {
-      padding: '8px 16px',
+      padding: '0 16px',
+      height: '32.6px',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      fontSize: '12px',
+      fontSize: '11px',
       color: 'var(--color-text-base, #666)',
       borderTop: '1px solid var(--color-foreground-xlight, #f0f0f0)',
-    },
-    creditsInfo: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-    },
-    creditsText: {
-      fontWeight: 400,
-    },
-    creditsCount: {
-      fontWeight: 600,
-    },
-    getMoreLink: {
-      color: 'var(--color-primary, #7C3AED)',
-      textDecoration: 'none',
-      fontWeight: 500,
-      fontSize: '12px',
+      background: 'var(--color-background-xlight, #ffffff)',
     },
     textarea: {
       flex: 1,
@@ -263,67 +251,62 @@ export const ChatInput = ({ onSend, onCommand, disabled = false }) => {
         title="Drag to resize"
       />
       <div style={styles.container}>
-        {isMenuOpen && filteredCommands.length > 0 && (
-          <CommandMenu
-            commands={filteredCommands}
-            selectedIndex={selectedIndex}
-            onSelect={command => selectCommand(command, executeCommand)}
-            onHover={highlightCommand}
-            menuRef={commandMenuRef}
-          />
-        )}
-
-        <textarea
-          ref={textareaRef}
-          style={{
-            ...styles.textarea,
-            ...(isFocused ? styles.textareaFocus : {}),
-          }}
-          placeholder="Ask me to build your workflow..."
-          value={value}
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          disabled={disabled}
-          rows={1}
-        />
-        <button
-          style={{
-            ...styles.button,
-            ...(isHovered && !disabled && value.trim() ? styles.buttonHover : {}),
-          }}
-          onClick={handleSubmit}
-          disabled={disabled || !value.trim()}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 12l7-7 7 7M12 19V5"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+        <div style={styles.inputContainer}>
+          {isMenuOpen && filteredCommands.length > 0 && (
+            <CommandMenu
+              commands={filteredCommands}
+              selectedIndex={selectedIndex}
+              onSelect={command => selectCommand(command, executeCommand)}
+              onHover={highlightCommand}
+              menuRef={commandMenuRef}
             />
-          </svg>
-        </button>
-      </div>
+          )}
 
-      <div style={styles.creditsBar}>
-        <div style={styles.creditsInfo}>
-          <span style={styles.creditsText}>
-            <span style={styles.creditsCount}>∞</span> credits available
-          </span>
+          <textarea
+            ref={textareaRef}
+            style={{
+              ...styles.textarea,
+              ...(isFocused ? styles.textareaFocus : {}),
+            }}
+            placeholder="Ask me to build your workflow..."
+            value={value}
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            disabled={disabled}
+            rows={1}
+          />
+          <button
+            style={{
+              ...styles.button,
+              ...(isHovered && !disabled && value.trim() ? styles.buttonHover : {}),
+            }}
+            onClick={handleSubmit}
+            disabled={disabled || !value.trim()}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M5 12l7-7 7 7M12 19V5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
-        <a
-          href="https://nodeflip.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={styles.getMoreLink}
-        >
-          About NodeFlip
-        </a>
+
+        {/* Credits bar below input */}
+        <div style={styles.creditsBar}>
+          {remainingNodes !== null && remainingNodes !== undefined ? (
+            <span>{remainingNodes} nodes remaining this month</span>
+          ) : (
+            <span>Loading quota...</span>
+          )}
+        </div>
       </div>
     </div>
   )
