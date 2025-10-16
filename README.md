@@ -23,6 +23,10 @@ NodeFlip was in development before the official n8n AI builder was released. To 
 - 📅 **Backend Source Code** - Coming before end of October 2025
 - 🔑 **Current Usage** - For now, the extension requires the official **AI4Less provider** (get an API key at https://platform.ai4less.io/register)
 
+## 🎁 Limited Time Offer (Until 25 Oct 2025)
+
+Get a free 20 nodes API Key with GLM 4.6 as backend by filling this [form](https://form.ai4less.io/form/fuoSRVy9).
+
 ## ⚙️ Configuration
 
 1. Click the NodeFlip extension icon in your browser toolbar
@@ -33,10 +37,6 @@ NodeFlip was in development before the official n8n AI builder was released. To 
 6. Start chatting!
 
 The AI4Less platform uses **GLM 4.6** internally to power NodeFlip's workflow generation capabilities.
-
-## 🎁 Limited Time Offer (Until 25 Oct 2025)
-
-Get a free 20 nodes API with GLM 4.6 as backend by filling this [form](https://form.ai4less.io/form/fuoSRVy9).
 
 ## 📥 Installation
 
