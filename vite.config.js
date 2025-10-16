@@ -9,10 +9,13 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  const isProduction = mode === 'production'
+  
   return {
     build: {
       emptyOutDir: true,
       outDir: 'build',
+      minify: isProduction ? 'esbuild' : false,
       rollupOptions: {
         output: {
           chunkFileNames: 'assets/chunk-[hash].js',

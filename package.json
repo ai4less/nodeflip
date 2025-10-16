@@ -1,6 +1,6 @@
 {
   "name": "nodeflip",
-  "displayName": "NodeFlip AI",
+  "displayName": "NodeFlip: n8n Workflow AI Builder",
   "version": "1.0.0",
   "author": "ai4less",
   "description": "AI-powered assistant for building n8n workflows through natural conversation.",
@@ -20,7 +20,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/minify-page-scripts.js",
     "preview": "vite preview",
     "fmt": "prettier --write '**/*.{jsx,js,json,css,scss,md}'",
     "zip": "npm run build && node src/zip.js"

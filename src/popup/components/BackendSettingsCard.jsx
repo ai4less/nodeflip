@@ -53,6 +53,14 @@ export const BackendSettingsCard = ({
       marginTop: '8px',
       lineHeight: 1.5,
     },
+    apiKeyLink: {
+      color: colors.primary,
+      textDecoration: 'none',
+      fontWeight: 500,
+      borderBottom: `1px solid ${colors.primary}`,
+      transition: 'opacity 0.2s',
+      cursor: 'pointer',
+    },
   }
 
   return (
@@ -87,8 +95,17 @@ export const BackendSettingsCard = ({
       {status && <div style={styles.status}>{status}</div>}
 
       <p style={styles.helpText}>
-        Get your API key from your backend dashboard. Make sure the URL includes the protocol
-        (https://).
+        <a
+          href="https://platform.ai4less.io/register"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={styles.apiKeyLink}
+          onMouseEnter={(e) => (e.target.style.opacity = '0.7')}
+          onMouseLeave={(e) => (e.target.style.opacity = '1')}
+        >
+          Get your API key
+        </a>{' '}
+        from the platform. Make sure the URL includes the protocol (https://).
       </p>
     </div>
   )

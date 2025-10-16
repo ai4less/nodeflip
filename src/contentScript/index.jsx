@@ -16,6 +16,8 @@ const nodeflipIconUrl =
 logger.info('[nodeFlip] Content script loaded')
 
 let sidebarContainer = null
+let n8nStoreInjected = false
+let isInjecting = false
 
 /**
  * Wait for an element to appear in the DOM
@@ -58,6 +60,11 @@ function isWorkflowPage () {
  * Inject n8nStore script into page context
  */
 function injectN8NStoreScript () {
+  if (n8nStoreInjected) {
+    return
+  }
+
+  n8nStoreInjected = true
   // Inject the n8nStore.js script into the page context
   // This is needed because content scripts can't access the page's Vue app
   const script = document.createElement('script')
@@ -82,14 +89,30 @@ async function injectAIBuilder () {
     return
   }
 
+  if (isInjecting) {
+    return
+  }
+
+  isInjecting = true
+
   try {
     // Inject n8nStore into page context first
     injectN8NStoreScript()
 
-    // Wait for n8n app to be ready
-    const n8nApp = await waitForElement('#n8n-app')
-    logger.log('[nodeFlip] n8n app found, injecting AI Builder')
+    // Reuse existing sidebar if it survived the navigation
+    const existingSidebar = document.getElementById('nodeflip-ai-builder')
+    if (existingSidebar) {
+      sidebarContainer = existingSidebar
+      await injectToggleButton()
+      return
+    }
 
+    // Try to find n8n app (might already exist from previous nav)
+    let n8nApp = document.querySelector('#n8n-app')
+    if (!n8nApp) {
+      n8nApp = await waitForElement('#n8n-app', 5000)
+    }
+    
     // Create sidebar container
     sidebarContainer = document.createElement('div')
     sidebarContainer.id = 'nodeflip-ai-builder'
@@ -101,12 +124,13 @@ async function injectAIBuilder () {
 
     // Render Preact component
     render(<AIBuilder />, sidebarContainer)
-    logger.log('[nodeFlip] AI Builder sidebar injected')
 
     // Inject toggle button
     await injectToggleButton()
   } catch (error) {
     logger.error('[nodeFlip] Failed to inject AI Builder:', error)
+  } finally {
+    isInjecting = false
   }
 }
 
@@ -119,7 +143,6 @@ async function injectToggleButton () {
     const wrapper = await waitForElement('[class*="_nodeButtonsWrapper"]', 15000)
 
     if (!wrapper) {
-      console.warn('[nodeFlip] Button wrapper not found')
       return
     }
 
@@ -169,6 +192,47 @@ async function injectToggleButton () {
     logger.error('[nodeFlip] Failed to inject toggle button:', error)
   }
 }
+
+/**
+ * Tear down AI Builder when leaving workflow pages
+ */
+function destroyAIBuilder () {
+  if (sidebarContainer) {
+    render(null, sidebarContainer)
+    sidebarContainer.remove()
+    sidebarContainer = null
+  }
+
+  const toggleButton = document.querySelector('[data-test-id="nodeflip-ai-toggle"]')
+  if (toggleButton) {
+    toggleButton.remove()
+  }
+}
+
+/**
+ * Detect URL pathname changes during SPA navigation
+ */
+let lastPathname = window.location.pathname
+const urlObserver = setInterval(() => {
+  const currentPathname = window.location.pathname
+  if (currentPathname !== lastPathname) {
+    lastPathname = currentPathname
+    if (isWorkflowPage()) {
+      // Destroy first to reset state
+      destroyAIBuilder()
+      // Reset injection flags
+      isInjecting = false
+      n8nStoreInjected = false
+      sidebarContainer = null
+      // Then inject fresh
+      setTimeout(() => {
+        injectAIBuilder()
+      }, 100)
+    } else {
+      destroyAIBuilder()
+    }
+  }
+}, 500)
 
 /**
  * Initialize when DOM is ready
