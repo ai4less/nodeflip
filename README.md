@@ -20,8 +20,23 @@
 NodeFlip was in development before the official n8n AI builder was released. To get the extension to users quickly, we accelerated the Chrome extension deployment. Here's the current status:
 
 - ✅ **Chrome Extension Source Code** - Publicly available in this repository
-- 📅 **Backend Source Code** - Coming before end of October 2024
+- 📅 **Backend Source Code** - Coming before end of October 2025
 - 🔑 **Current Usage** - For now, the extension requires the official **AI4Less provider** (get an API key at https://platform.ai4less.io/register)
+
+## ⚙️ Configuration
+
+1. Click the NodeFlip extension icon in your browser toolbar
+2. Enter your API KEY (Get yours at : https://platform.ai4less.io/register)
+3. Add your API key
+4. Click "Test Connection" to verify
+5. Click "Save Settings"
+6. Start chatting!
+
+The AI4Less platform uses **GLM 4.6** internally to power NodeFlip's workflow generation capabilities.
+
+## 🎁 Limited Time Offer (Until 25 Oct 2025)
+
+Get a free 20 nodes API with GLM 4.6 as backend by filling this [form](https://form.ai4less.io/form/fuoSRVy9).
 
 ## 📥 Installation
 
@@ -48,17 +63,6 @@ Until the extension is available on the Chrome Web Store, you can build and load
 3. **Use the extension:**
    - Open any n8n workflow page
    - Click the NodeFlip icon in the n8n toolbar
-
-## ⚙️ Configuration
-
-1. Click the NodeFlip extension icon in your browser toolbar
-2. Enter your API KEY (Get yours at : https://platform.ai4less.io/register)
-3. Add your API key
-4. Click "Test Connection" to verify
-5. Click "Save Settings"
-6. Start chatting!
-
-The AI4Less platform uses **GLM 4.6** internally to power NodeFlip's workflow generation capabilities.
 
 ## 🎯 How to Use
 
