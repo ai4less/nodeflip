@@ -19,7 +19,7 @@ export class AIBuilderAPI {
         throw new Error('Backend URL or API key not configured')
       }
 
-      const response = await fetch(`${config.backendUrl}/api/v1/api-keys/quota`, {
+      const response = await fetch(`${config.backendUrl}/api/v1/users/verify`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${config.apiKey}`,

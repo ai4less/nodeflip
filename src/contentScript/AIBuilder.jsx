@@ -100,7 +100,11 @@ export const AIBuilder = () => {
       // Don't load messages from backend - we manage history in frontend
       // Load from local storage instead
       try {
-        const savedState = await chrome.storage.local.get(['chatMessages', 'lastAddedNodeName', 'remainingNodes'])
+        const savedState = await chrome.storage.local.get([
+          'chatMessages',
+          'lastAddedNodeName',
+          'remainingNodes',
+        ])
         if (savedState.chatMessages && Array.isArray(savedState.chatMessages)) {
           setMessages(savedState.chatMessages)
         } else {
@@ -109,7 +113,10 @@ export const AIBuilder = () => {
         setLastAddedNodeName(savedState.lastAddedNodeName || null)
         setRemainingNodes(savedState.remainingNodes ?? null)
       } catch (storageError) {
-        console.warn('[nodeFlip] Could not load from storage (extension context may be invalid):', storageError)
+        console.warn(
+          '[nodeFlip] Could not load from storage (extension context may be invalid):',
+          storageError,
+        )
         setMessages([])
         setLastAddedNodeName(null)
         setRemainingNodes(null)
@@ -118,13 +125,11 @@ export const AIBuilder = () => {
       // Fetch fresh quota from backend
       try {
         const quota = await apiRef.current.getQuota()
-        console.log('[nodeFlip] Fetched quota:', quota)
-        console.log('[nodeFlip] Setting remainingNodes to:', quota.remaining_nodes)
-        setRemainingNodes(quota.remaining_nodes)
-        
+        setRemainingNodes(quota.remaining?.n8n_nodes)
+
         // Also persist to storage
         if (typeof chrome !== 'undefined' && chrome.storage) {
-          chrome.storage.local.set({ remainingNodes: quota.remaining_nodes }).catch(err => {
+          chrome.storage.local.set({ remainingNodes: quota.remaining?.n8n_nodes }).catch(err => {
             console.warn('[nodeFlip] Failed to save quota to storage:', err)
           })
         }
@@ -135,10 +140,15 @@ export const AIBuilder = () => {
       }
     } catch (err) {
       console.error('[nodeFlip] Failed to load chat:', err)
-      
+
       // Check if it's an authentication error
-      if (err.message && (err.message.includes('401') || err.message.includes('Invalid credentials'))) {
-        setError('Please configure your API credentials in the extension popup, then refresh the page.')
+      if (
+        err.message &&
+        (err.message.includes('401') || err.message.includes('Invalid credentials'))
+      ) {
+        setError(
+          'Please configure your API credentials in the extension popup, then refresh the page.',
+        )
       } else if (err.message && err.message.includes('Backend not configured')) {
         setError('Please configure your backend URL and API key in the extension popup.')
       } else {
@@ -172,7 +182,7 @@ export const AIBuilder = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    
+
     // Save messages to local storage whenever they change
     if (messages.length > 0 && typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.set({ chatMessages: messages }).catch(err => {
@@ -180,12 +190,15 @@ export const AIBuilder = () => {
       })
     }
   }, [messages])
-  
+
   // Save lastAddedNodeName and remainingNodes to local storage whenever they change
   useEffect(() => {
     if (chatId && typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.set({ lastAddedNodeName, remainingNodes }).catch(err => {
-        console.warn('[nodeFlip] Failed to save to storage (extension context may be invalid):', err)
+        console.warn(
+          '[nodeFlip] Failed to save to storage (extension context may be invalid):',
+          err,
+        )
       })
     }
   }, [lastAddedNodeName, remainingNodes, chatId])
@@ -260,7 +273,7 @@ export const AIBuilder = () => {
         const config = await api.getConfig()
         const endpoint = catalogType === 'standard' ? 'sync-global' : 'sync-custom'
 
-        const response = await fetch(`${config.backendUrl}/api/v1/node-catalog/${endpoint}`, {
+        const response = await fetch(`${config.backendUrl}/api/v1/admin/node-catalog/${endpoint}`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
@@ -452,21 +465,24 @@ export const AIBuilder = () => {
                       })
 
                       await addNodePromise
-                      
+
                       // Track the node that was just added
                       setLastAddedNodeName(msg.data.node.name)
-                      
+
                       // Track this node in our state
-                      setAddedNodes(prev => [...prev, {
-                        name: msg.data.node.name,
-                        type: msg.data.node.type
-                      }])
-                      
+                      setAddedNodes(prev => [
+                        ...prev,
+                        {
+                          name: msg.data.node.name,
+                          type: msg.data.node.type,
+                        },
+                      ])
+
                       // Fetch fresh quota after node is added
                       try {
                         const quota = await apiRef.current.getQuota()
                         console.log('[nodeFlip] Updated quota after node addition:', quota)
-                        setRemainingNodes(quota.remaining_nodes)
+                        setRemainingNodes(quota.remaining?.n8n_nodes)
                       } catch (quotaError) {
                         console.warn('[nodeFlip] Could not fetch updated quota:', quotaError)
                       }
@@ -679,12 +695,17 @@ export const AIBuilder = () => {
     // Clear chat data from storage
     try {
       if (typeof chrome !== 'undefined' && chrome.storage) {
-        await chrome.storage.local.remove(['chatMessages', 'chatId', 'lastAddedNodeName', 'remainingNodes'])
+        await chrome.storage.local.remove([
+          'chatMessages',
+          'chatId',
+          'lastAddedNodeName',
+          'remainingNodes',
+        ])
       }
     } catch (err) {
       console.warn('[nodeFlip] Failed to clear storage:', err)
     }
-    
+
     // Reset state
     setChatId(null)
     setMessages([])
@@ -692,7 +713,7 @@ export const AIBuilder = () => {
     setLastAddedNodeName(null)
     setRemainingNodes(null)
     setAddedNodes([]) // Clear tracked nodes
-    
+
     // Load new chat
     await loadChat()
   }, [loadChat])
@@ -745,9 +766,9 @@ export const AIBuilder = () => {
               />
             )}
 
-            <ChatInput 
-              onSend={handleSendMessage} 
-              onCommand={handleCommand} 
+            <ChatInput
+              onSend={handleSendMessage}
+              onCommand={handleCommand}
               disabled={inputDisabled}
               remainingNodes={remainingNodes}
             />
