@@ -4,6 +4,10 @@
  */
 
 import { logger } from '@src/utils/logger'
+import { generatePropertyInspectorForm, extractFormData } from './schemaFormGenerator'
+import { getCachedCustomNodes } from './customNodeIcons'
+import { AIBuilderAPI } from './api'
+import './styles/propertyInspector.css'
 
 let nodePanelObserver = null
 
@@ -55,8 +59,6 @@ async function checkAndInjectBranding(nodeSettings) {
       console.log('[nodeFlip] ❌ Not an HTTP Request node')
       return
     }
-    console.log('[nodeFlip] ✓ HTTP Request node detected')
-
     // 2. Get the node name
     const nameInput = nodeSettings.querySelector('input[data-test-id="inline-edit-input"]')
     if (!nameInput) {
@@ -65,8 +67,6 @@ async function checkAndInjectBranding(nodeSettings) {
     }
 
     const nodeName = nameInput.value
-    console.log(`[nodeFlip] 📝 Node name: "${nodeName}"`)
-
     // 3. Fast path: Check if we just clicked this custom node
     if (window.lastClickedCustomNode) {
       const { node, timestamp } = window.lastClickedCustomNode
@@ -74,9 +74,6 @@ async function checkAndInjectBranding(nodeSettings) {
       
       // If clicked within last 2 seconds and name matches
       if (age < 2000 && node.name === nodeName) {
-        console.log(`[nodeFlip] ⚡ FAST PATH! Using recently clicked custom node data`)
-        console.log(`[nodeFlip] 🎉 MATCH! "${nodeName}" is an AI4Less node!`, node)
-        
         // Clear the stored data
         window.lastClickedCustomNode = null
         
@@ -87,13 +84,10 @@ async function checkAndInjectBranding(nodeSettings) {
     }
 
     // 4. Slow path: Fetch from backend
-    console.log('[nodeFlip] 🐌 Falling back to backend fetch...')
-    const { getCachedCustomNodes } = await import('./customNodeIcons')
     let customNodes = getCachedCustomNodes()
     
     // If no cache, fetch fresh
     if (!customNodes || customNodes.length === 0) {
-      const { AIBuilderAPI } = await import('./api')
       const api = new AIBuilderAPI()
       const isConfigured = await api.isConfigured()
 
@@ -103,7 +97,6 @@ async function checkAndInjectBranding(nodeSettings) {
       }
 
       customNodes = await api.getCustomNodes()
-      console.log(`[nodeFlip] 📦 Fetched ${customNodes.length} custom nodes from backend`)
     } else {
       console.log(`[nodeFlip] ⚡ Using ${customNodes.length} cached custom nodes`)
     }
@@ -114,8 +107,6 @@ async function checkAndInjectBranding(nodeSettings) {
       console.log(`[nodeFlip] ❌ "${nodeName}" is not a custom node`)
       return
     }
-
-    console.log(`[nodeFlip] 🎉 MATCH! "${nodeName}" is an AI4Less node!`, matchingNode)
 
     // 5. Inject AI4Less custom interface
     injectAI4LessInterface(nodeSettings, matchingNode)
@@ -128,11 +119,8 @@ async function checkAndInjectBranding(nodeSettings) {
  * Inject AI4Less branded interface for custom node
  */
 function injectAI4LessInterface(nodeSettings, customNode) {
-  console.log('[nodeFlip] 🎨 Injecting AI4Less interface...')
-  
   // Check if already injected
   if (nodeSettings.querySelector('[data-ai4less-interface]')) {
-    console.log('[nodeFlip] ⚠️ Interface already injected, skipping')
     return
   }
 
@@ -170,16 +158,15 @@ function injectAI4LessInterface(nodeSettings, customNode) {
 
   // Insert after header
   header.parentNode.insertBefore(banner, header.nextSibling)
-  console.log('[nodeFlip] ✅ AI4Less banner injected!')
 
   // Replace header icon
   replaceHeaderIcon(nodeSettings)
 
-  // Hide technical HTTP fields
-  hideHttpTechnicalFields(nodeSettings)
-
-  // Generate clean input form
+  // Generate clean input form FIRST
   generateCleanInputForm(nodeSettings, customNode)
+
+  // THEN hide technical HTTP fields
+  hideHttpTechnicalFields(nodeSettings)
 
   logger.log('[nodeFlip] AI4Less interface fully injected')
 }
@@ -188,14 +175,11 @@ function injectAI4LessInterface(nodeSettings, customNode) {
  * Replace the HTTP icon in the header with custom icon
  */
 function replaceHeaderIcon(nodeSettings) {
-  console.log('[nodeFlip] 🎨 Replacing header icon...')
-  
   // Find the header icon img
   const headerIcon = nodeSettings.querySelector('img[src*="httprequest"]')
   
   if (headerIcon) {
     headerIcon.src = 'https://seleniumbase.io/img/logo3c.png'
-    console.log('[nodeFlip] ✅ Header icon replaced!')
   } else {
     console.log('[nodeFlip] ⚠️ Could not find header icon')
   }
@@ -205,126 +189,82 @@ function replaceHeaderIcon(nodeSettings) {
  * Hide HTTP technical fields that users don't need to see
  */
 function hideHttpTechnicalFields(nodeSettings) {
-  console.log('[nodeFlip] 🙈 Hiding technical HTTP fields...')
-  
   const fieldsToHide = [
-    'url',
-    'authentication',
-    'genericAuthType',
-    'sendHeaders',
-    'specifyHeaders',
-    'headerParameters',
-    'sendBody',
-    'contentType',
-    'specifyBody',
-    'jsonBody',
+    'method', 'url', 'authentication', 'genericAuthType',
+    'sendQuery', 'sendHeaders', 'specifyHeaders', 'headerParameters',
+    'sendBody', 'contentType', 'specifyBody', 'jsonBody',
+    'options', 'timeout'
   ]
 
   let hiddenCount = 0
-  fieldsToHide.forEach((fieldName) => {
-    const paramItem = nodeSettings.querySelector(`[data-test-id="parameter-input-${fieldName}"]`)
-    if (paramItem) {
-      const parentItem = paramItem.closest('[data-test-id="parameter-item"]')
-      if (parentItem) {
-        parentItem.style.display = 'none'
-        hiddenCount++
-      }
+  
+  // Get all parameter items
+  const parameterItems = nodeSettings.querySelectorAll('[data-test-id="parameter-item"]')
+  
+  parameterItems.forEach((item) => {
+    // IMPORTANT: Don't hide our AI4Less form!
+    if (item.querySelector('[data-ai4less-form]')) {
+      return
+    }
+    
+    // Check if this item contains any field we want to hide
+    const shouldHide = fieldsToHide.some(fieldName => {
+      // Check by data-test-id (parameter-input-, fixed-collection-, etc.)
+      if (item.querySelector(`[data-test-id*="${fieldName}"]`)) return true
+      
+      // Check by label for attribute
+      if (item.querySelector(`label[for="${fieldName}"]`)) return true
+      
+      // Check by label text content
+      const labels = item.querySelectorAll('label')
+      return Array.from(labels).some(label => 
+        label.textContent.toLowerCase().includes(fieldName.toLowerCase().replace(/([A-Z])/g, ' $1').trim())
+      )
+    })
+    
+    // Also hide import sections and callouts
+    if (item.querySelector('[class*="_importSection_"]') || 
+        item.querySelector('.n8n-callout') ||
+        item.querySelector('.notice, [class*="_notice_"]')) {
+      item.style.display = 'none'
+      hiddenCount++
+      return
+    }
+    
+    if (shouldHide) {
+      item.style.display = 'none'
+      hiddenCount++
     }
   })
-
-  // Also hide the "Import cURL" section and callout
-  const importSection = nodeSettings.querySelector('[class*="_importSection_"]')
-  if (importSection) {
-    const parentItem = importSection.closest('[data-test-id="parameter-item"]')
-    if (parentItem) {
-      parentItem.style.display = 'none'
-      hiddenCount++
-    }
-  }
-
-  const callout = nodeSettings.querySelector('.n8n-callout')
-  if (callout) {
-    const parentItem = callout.closest('[data-test-id="parameter-item"]')
-    if (parentItem) {
-      parentItem.style.display = 'none'
-      hiddenCount++
-    }
-  }
-  
-  console.log(`[nodeFlip] ✅ Hidden ${hiddenCount} technical fields`)
 }
 
 /**
- * Generate clean input form based on custom node schema
+ * Generate Property Inspector form based on custom node schema
  */
 function generateCleanInputForm(nodeSettings, customNode) {
-  console.log('[nodeFlip] 📝 Generating clean input form...')
-  
   // Find the parameter list wrapper
   const parameterList = nodeSettings.querySelector('.parameter-input-list-wrapper')
   if (!parameterList) {
-    console.log('[nodeFlip] ❌ Could not find parameter list wrapper')
     return
   }
 
-  // Create clean input section
-  const inputSection = document.createElement('div')
-  inputSection.dataset.ai4lessInputs = 'true'
-  inputSection.style.cssText = `
-    background: #f9fafb;
-    padding: 16px;
-    margin: 16px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-  `
-
-  // For now, show a simple input data field
-  // TODO: Parse actual schema from backend and generate dynamic fields
-  inputSection.innerHTML = `
-    <div style="margin-bottom: 12px;">
-      <label style="display: block; font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 6px;">
-        Input Data
-      </label>
-      <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
-        Enter the data to process. You can use n8n expressions like <code>{{ $json.fieldName }}</code>
-      </div>
-      <textarea 
-        data-ai4less-input="input_data"
-        placeholder="Enter your input data or use {{ $json }} to pass previous node data"
-        style="
-          width: 100%;
-          min-height: 80px;
-          padding: 8px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          font-family: monospace;
-          font-size: 13px;
-          resize: vertical;
-        "
-      >={{ $json }}</textarea>
-    </div>
-    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; font-size: 12px; color: #1e40af;">
-      <strong>💡 Tip:</strong> This AI4Less node will automatically format and send your data to the backend. No need to configure URLs or authentication!
-    </div>
+  // Generate form from schema
+  const formContainer = generatePropertyInspectorForm(customNode.input_schema)
+  formContainer.style.cssText = `
+    padding-block: 16px;
   `
 
   // Insert at the beginning of parameter list
-  parameterList.insertBefore(inputSection, parameterList.firstChild)
-  console.log('[nodeFlip] ✅ Clean input form generated')
+  parameterList.insertBefore(formContainer, parameterList.firstChild)
 
-  // Set up input synchronization with hidden JSON field
-  const textarea = inputSection.querySelector('textarea[data-ai4less-input]')
-  if (textarea) {
-    syncInputWithJsonBody(nodeSettings, textarea)
-  }
+  // Set up form synchronization with hidden JSON field
+  setupFormSync(nodeSettings, formContainer)
 }
 
 /**
- * Sync user-friendly input with the hidden JSON body field
+ * Set up form synchronization with hidden JSON body field
  */
-function syncInputWithJsonBody(nodeSettings, textarea) {
-  console.log('[nodeFlip] 🔄 Setting up input synchronization...')
-  
+function setupFormSync(nodeSettings, formContainer) {
   // Find the JSON body code editor
   const jsonBodyInput = nodeSettings.querySelector(
     '[data-test-id="parameter-input-jsonBody"] .cm-content',
@@ -335,35 +275,25 @@ function syncInputWithJsonBody(nodeSettings, textarea) {
     return
   }
 
-  // Initialize textarea with current JSON value
-  try {
-    const currentText = jsonBodyInput.textContent
-    if (currentText) {
-      const parsed = JSON.parse(currentText)
-      if (parsed.input_data) {
-        textarea.value = parsed.input_data.replace(/^"=|"$/g, '').replace(/={{ \$json }}/, '={{ $json }}')
-        console.log('[nodeFlip] ✅ Initialized textarea with existing value')
-      }
-    }
-  } catch (e) {
-    // Ignore parse errors
-    console.log('[nodeFlip] ⚠️ Could not parse existing JSON value')
-  }
-
-  // Listen for changes and update JSON
-  textarea.addEventListener('input', () => {
-    const inputValue = textarea.value
-    const jsonValue = JSON.stringify({ input_data: `=${inputValue}` })
+  // Function to sync form to JSON
+  const syncFormToJson = () => {
+    const formData = extractFormData(formContainer)
+    const jsonValue = JSON.stringify({ input_data: formData })
 
     // Update the CodeMirror editor
-    if (jsonBodyInput) {
-      jsonBodyInput.textContent = jsonValue
-      // Trigger change event
-      const event = new Event('input', { bubbles: true })
-      jsonBodyInput.dispatchEvent(event)
-      console.log('[nodeFlip] 🔄 Synced input to JSON body:', jsonValue)
-    }
+    jsonBodyInput.textContent = jsonValue
+    // Trigger change event
+    const event = new Event('input', { bubbles: true })
+    jsonBodyInput.dispatchEvent(event)
+  }
+
+  // Listen for changes on all form inputs
+  const inputs = formContainer.querySelectorAll('input, select, textarea')
+  inputs.forEach((input) => {
+    input.addEventListener('input', syncFormToJson)
+    input.addEventListener('change', syncFormToJson)
   })
-  
-  console.log('[nodeFlip] ✅ Input synchronization active')
+
+  // Initial sync
+  syncFormToJson()
 }

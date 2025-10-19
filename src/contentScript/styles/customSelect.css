@@ -1,0 +1,201 @@
+/**
+ * Custom Select Component Styles
+ */
+
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+/* Trigger button */
+.custom-select-trigger {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 8px 32px 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+
+.custom-select-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-select-trigger:focus,
+.custom-select-trigger.open {
+  outline: none;
+  border-color: #667eea;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.custom-select-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+}
+
+.custom-select-arrow {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: transform 0.2s ease;
+  color: #aaa;
+  pointer-events: none;
+}
+
+.custom-select-trigger.open .custom-select-arrow {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Dropdown menu */
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Search input */
+.custom-select-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+  color: #aaa;
+  border-radius: 6px 6px 0 0;
+}
+
+.custom-select-search svg {
+  flex-shrink: 0;
+}
+
+.custom-select-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.custom-select-search-input::placeholder {
+  color: #666;
+}
+
+/* Options list */
+.custom-select-options {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 240px;
+  padding: 4px;
+}
+
+/* Custom scrollbar */
+.custom-select-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-select-options::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.custom-select-options::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.custom-select-options::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Individual option */
+.custom-select-option {
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+  color: #e0e0e0;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.custom-select-option:hover,
+.custom-select-option.highlighted {
+  background: rgba(102, 126, 234, 0.15);
+  color: #fff;
+}
+
+.custom-select-option.selected {
+  background: rgba(102, 126, 234, 0.2);
+  color: #fff;
+  font-weight: 500;
+}
+
+.custom-select-option.selected:hover,
+.custom-select-option.selected.highlighted {
+  background: rgba(102, 126, 234, 0.25);
+}
+
+.custom-select-option.empty {
+  color: #888;
+  font-style: italic;
+  cursor: default;
+}
+
+.custom-select-option.empty:hover {
+  background: transparent;
+}
+
+.custom-select-check {
+  flex-shrink: 0;
+  color: #667eea;
+}

@@ -6,7 +6,8 @@
 import nodeflipIcon from '@src/assets/nodeflip.svg'
 import { logger } from '@src/utils/logger'
 import { isWorkflowPage } from './utils/domUtils'
-import { injectAIBuilder, destroyAIBuilder, resetSidebarState } from './sidebarManager'
+import { injectAIBuilder, destroyAIBuilder, resetSidebarState } from './sidebarManager.jsx'
+import './styles/propertyInspector.css'
 
 const nodeflipIconUrl =
   typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'

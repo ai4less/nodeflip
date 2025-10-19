@@ -4,6 +4,7 @@
  */
 
 import { logger } from '@src/utils/logger'
+import { AIBuilderAPI } from './api'
 
 let canvasObserver = null
 let customNodesCache = null
@@ -23,7 +24,6 @@ async function getCustomNodes() {
   }
   
   // Fetch fresh
-  const { AIBuilderAPI } = await import('./api')
   const api = new AIBuilderAPI()
   const isConfigured = await api.isConfigured()
   

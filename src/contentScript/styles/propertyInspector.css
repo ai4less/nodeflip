@@ -1,0 +1,286 @@
+/**
+ * Property Inspector Styles
+ * Professional interface for AI4Less custom nodes
+ */
+
+/* Main container */
+.ai4less-property-inspector {
+  background: transparent;
+  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* Section header */
+.property-section-header {
+  padding: 16px 0 8px 0;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #aaa;
+  background: transparent;
+}
+
+.property-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+}
+
+/* Field container */
+.property-field {
+  padding: 0 0 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.property-field:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+/* Field label */
+.property-field-label {
+  margin-bottom: 8px;
+}
+
+.property-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: default;
+  line-height: 1.4;
+}
+
+.property-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.property-label-text {
+  flex: 1;
+}
+
+.property-required {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+/* Field description */
+.property-description {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+/* Input wrapper for Preact components */
+.property-input-wrapper {
+  width: 100%;
+}
+
+/* Toggle switch */
+.property-toggle-container {
+  display: flex;
+  align-items: center;
+}
+
+.property-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.property-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.property-toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #404040;
+  transition: 0.3s;
+  border-radius: 22px;
+}
+
+.property-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.property-toggle input:checked + .property-toggle-slider {
+  background-color: #667eea;
+}
+
+.property-toggle input:checked + .property-toggle-slider:before {
+  transform: translateX(18px);
+}
+
+.property-toggle:hover .property-toggle-slider {
+  background-color: #505050;
+}
+
+.property-toggle input:checked:hover + .property-toggle-slider {
+  background-color: #7c8efc;
+}
+
+/* Radio buttons */
+.property-radio-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.property-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.property-radio:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.property-radio input[type="radio"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #666;
+  border-radius: 50%;
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+}
+
+.property-radio input[type="radio"]:checked {
+  border-color: #667eea;
+}
+
+.property-radio input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #667eea;
+}
+
+.property-radio-label {
+  font-size: 12px;
+  color: #e0e0e0;
+  user-select: none;
+}
+
+/* Slider */
+.property-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.property-input-slider {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+  background: #404040;
+  padding: 0;
+}
+
+.property-input-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.property-input-slider::-webkit-slider-thumb:hover {
+  background: #7c8efc;
+  transform: scale(1.1);
+}
+
+.property-input-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #667eea;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.property-input-slider::-moz-range-thumb:hover {
+  background: #7c8efc;
+  transform: scale(1.1);
+}
+
+.property-slider-value {
+  min-width: 36px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+  color: #e0e0e0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hint text */
+.property-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+}
+
+.property-hint code {
+  background: #2a2a2a;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10px;
+  color: #9eccff;
+}
+
+/* Error state */
+.property-error {
+  padding: 24px 16px;
+  text-align: center;
+  color: #ff6b6b;
+}
+
+.property-error p {
+  margin: 0;
+  font-size: 12px;
+}

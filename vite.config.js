@@ -23,7 +23,20 @@ export default defineConfig(({ mode }) => {
       },
     },
 
-    plugins: [crx({ manifest }), preact()],
+    plugins: [
+      crx({ 
+        manifest,
+        // Disable auto-reload in dev mode to prevent tab reloading
+        contentScripts: {
+          injectCss: false,
+        },
+        // Disable browser auto-reload
+        browser: isProduction ? undefined : {
+          loadExtension: false
+        }
+      }), 
+      preact()
+    ],
     resolve: {
       alias: {
         '@src': resolve(projectRoot, 'src'),
