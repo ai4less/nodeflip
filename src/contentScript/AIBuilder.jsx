@@ -12,6 +12,7 @@ import { useSidebarToggle } from './hooks/useSidebarToggle'
 import { AIBuilderHeader } from './components/AIBuilderHeader'
 import { MessagesPanel } from './components/MessagesPanel'
 import { ApprovalBanner } from './components/ApprovalBanner'
+import { NodesPanel } from './components/NodesPanel'
 
 const N8N_DELIMITER = '⧉⇋⇋➽⌑⧉§§'
 
@@ -718,6 +719,104 @@ export const AIBuilder = () => {
     await loadChat()
   }, [loadChat])
 
+  const handleNodeSelect = useCallback(
+    async (node) => {
+      if (isSending) return
+
+      try {
+        setIsSending(true)
+
+        const config = await apiRef.current.getConfig()
+
+        // Create HTTP node configuration
+        const nodeConfig = {
+          type: 'n8n-nodes-base.httpRequest',
+          name: node.name,
+          parameters: {
+            url: `${config.backendUrl}/api/v1/custom-nodes/${node.id}/execute`,
+            method: 'POST',
+            authentication: 'genericCredentialType',
+            genericAuthType: 'httpHeaderAuth',
+            sendHeaders: true,
+            headerParameters: {
+              parameters: [
+                {
+                  name: 'Authorization',
+                  value: `Bearer ${config.apiKey}`,
+                },
+              ],
+            },
+            sendBody: true,
+            specifyBody: 'json',
+            jsonBody: JSON.stringify({ input_data: '={{ $json }}' }),
+            options: {
+              timeout: 30000,
+            },
+          },
+        }
+
+        // Add node to canvas
+        const addNodePromise = new Promise((resolve, reject) => {
+          const messageId = `add-node-${Date.now()}`
+
+          const handleResponse = (event) => {
+            if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
+              window.removeEventListener('message', handleResponse)
+              if (event.data.success) {
+                resolve(event.data.result)
+              } else {
+                reject(new Error(event.data.error || 'Failed to add node'))
+              }
+            }
+          }
+
+          window.addEventListener('message', handleResponse)
+
+          window.postMessage(
+            {
+              type: 'n8nStore-addNode',
+              messageId,
+              nodeConfig,
+              previousNodeName: lastAddedNodeName,
+            },
+            '*',
+          )
+
+          setTimeout(() => {
+            window.removeEventListener('message', handleResponse)
+            reject(new Error('Timeout'))
+          }, 5000)
+        })
+
+        await addNodePromise
+        setLastAddedNodeName(node.name)
+
+        // Show success message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `✅ Added "${node.name}" node to your workflow`,
+            timestamp: new Date().toISOString(),
+          },
+        ])
+      } catch (error) {
+        console.error('[nodeFlip] Failed to add custom node:', error)
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'error',
+            content: `Failed to add node: ${error.message}`,
+            timestamp: new Date().toISOString(),
+          },
+        ])
+      } finally {
+        setIsSending(false)
+      }
+    },
+    [isSending, lastAddedNodeName],
+  )
+
   const styles = createContainerStyles(width, isResizing, isVisible)
   const inputDisabled = isSending || !chatId || !!error || !!pendingApproval
   const approvalData = !isSending ? pendingApproval : null
@@ -765,6 +864,8 @@ export const AIBuilder = () => {
                 onRequestChanges={handleRequestChanges}
               />
             )}
+
+            <NodesPanel onNodeSelect={handleNodeSelect} isDisabled={inputDisabled} />
 
             <ChatInput
               onSend={handleSendMessage}

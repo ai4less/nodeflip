@@ -252,4 +252,27 @@ export class AIBuilderAPI {
     const config = await this.getConfig()
     return !!(config.backendUrl && config.apiKey)
   }
+
+  /**
+   * Get list of available custom nodes
+   */
+  async getCustomNodes() {
+    const config = await this.getConfig()
+    
+    if (!config.backendUrl || !config.apiKey) {
+      throw new Error('Backend not configured')
+    }
+    
+    const response = await fetch(`${config.backendUrl}/api/v1/custom-nodes/`, {
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch custom nodes: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
 }
