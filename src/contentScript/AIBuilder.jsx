@@ -720,7 +720,7 @@ export const AIBuilder = () => {
   }, [loadChat])
 
   const handleNodeSelect = useCallback(
-    async (node) => {
+    async node => {
       if (isSending) return
 
       try {
@@ -759,7 +759,7 @@ export const AIBuilder = () => {
         const addNodePromise = new Promise((resolve, reject) => {
           const messageId = `add-node-${Date.now()}`
 
-          const handleResponse = (event) => {
+          const handleResponse = event => {
             if (event.data?.type === 'n8nStore-response' && event.data.messageId === messageId) {
               window.removeEventListener('message', handleResponse)
               if (event.data.success) {
@@ -792,7 +792,7 @@ export const AIBuilder = () => {
         setLastAddedNodeName(node.name)
 
         // Show success message
-        setMessages((prev) => [
+        setMessages(prev => [
           ...prev,
           {
             role: 'assistant',
@@ -802,7 +802,7 @@ export const AIBuilder = () => {
         ])
       } catch (error) {
         console.error('[nodeFlip] Failed to add custom node:', error)
-        setMessages((prev) => [
+        setMessages(prev => [
           ...prev,
           {
             role: 'error',

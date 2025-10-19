@@ -112,7 +112,7 @@ async function injectAIBuilder () {
     if (!n8nApp) {
       n8nApp = await waitForElement('#n8n-app', 5000)
     }
-    
+
     // Create sidebar container
     sidebarContainer = document.createElement('div')
     sidebarContainer.id = 'nodeflip-ai-builder'
@@ -135,6 +135,80 @@ async function injectAIBuilder () {
 }
 
 /**
+ * Apply custom icons to HTTP nodes that are custom nodes
+ */
+async function applyCustomNodeIcons () {
+  try {
+    // Fetch custom nodes from backend
+    const { AIBuilderAPI } = await import('./api')
+    const api = new AIBuilderAPI()
+    const isConfigured = await api.isConfigured()
+
+    if (!isConfigured) {
+      return
+    }
+
+    const customNodes = await api.getCustomNodes()
+    if (!customNodes || customNodes.length === 0) {
+      return
+    }
+
+    // Get all node labels on the canvas
+    const labels = document.querySelectorAll('[class*="_label_"]')
+
+    for (const label of labels) {
+      const nodeName = label.textContent.trim()
+
+      // Check if this node name matches any custom node
+      const customNode = customNodes.find(cn => cn.name === nodeName)
+      if (customNode) {
+        const nodeContainer = label.closest('[data-test-id="canvas-default-node"]')
+        if (nodeContainer) {
+          const img = nodeContainer.querySelector('img[src*="httprequest"]')
+          if (img) {
+            if (!img.dataset.customIconApplied) {
+              img.src = 'https://seleniumbase.io/img/logo3c.png'
+              img.dataset.customIconApplied = 'true'
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('[nodeFlip] Failed to apply custom icons:', error)
+  }
+}
+
+/**
+ * Start observing canvas for new nodes
+ */
+let canvasObserver = null
+function startCanvasObserver () {
+  if (canvasObserver) {
+    canvasObserver.disconnect()
+  }
+
+  const canvas = document.querySelector('[data-test-id="canvas"]')
+  if (!canvas) {
+    // Retry after a delay
+    setTimeout(startCanvasObserver, 1000)
+    return
+  }
+
+  canvasObserver = new MutationObserver(() => {
+    applyCustomNodeIcons()
+  })
+
+  canvasObserver.observe(canvas, {
+    childList: true,
+    subtree: true,
+  })
+
+  // Apply icons immediately for existing nodes
+  applyCustomNodeIcons()
+}
+
+/**
  * Inject toggle button into n8n's button bar
  */
 async function injectToggleButton () {
@@ -147,7 +221,10 @@ async function injectToggleButton () {
     }
 
     // Check if button already exists
-    if (document.querySelector('[data-test-id="nodeflip-ai-toggle"]')) {
+    const existingButton = document.querySelector('[data-test-id="nodeflip-ai-toggle"]')
+    if (existingButton) {
+      // Still start the canvas observer even if button exists
+      startCanvasObserver()
       return
     }
 
@@ -188,6 +265,9 @@ async function injectToggleButton () {
     }
 
     logger.log('[nodeFlip] Toggle button injected')
+
+    // Start observing canvas for custom nodes
+    startCanvasObserver()
   } catch (error) {
     logger.error('[nodeFlip] Failed to inject toggle button:', error)
   }
@@ -206,6 +286,12 @@ function destroyAIBuilder () {
   const toggleButton = document.querySelector('[data-test-id="nodeflip-ai-toggle"]')
   if (toggleButton) {
     toggleButton.remove()
+  }
+
+  // Disconnect canvas observer
+  if (canvasObserver) {
+    canvasObserver.disconnect()
+    canvasObserver = null
   }
 }
 
