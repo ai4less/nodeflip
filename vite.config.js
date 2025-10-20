@@ -39,9 +39,7 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        '@src': resolve(projectRoot, 'src'),
-        'react': 'preact/compat',
-        'react-dom': 'preact/compat',
+        '@src': resolve(projectRoot, 'src')
       },
     },
     legacy: {
