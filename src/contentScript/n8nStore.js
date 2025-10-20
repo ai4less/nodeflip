@@ -54,21 +54,48 @@ export function getNodeTypesStore() {
   try {
     const app = document.getElementById("app")?.__vue_app__;
     if (!app) return null;
-    
+
     const provides = app._context?.provides;
     if (!provides) return null;
-    
+
     const symbols = Object.getOwnPropertySymbols(provides);
     const pinia = symbols
       .map(s => provides[s])
       .find(p => p.state && p.state.value);
-    
+
     if (!pinia) return null;
-    
+
     const nodeTypesStore = pinia._s.get("nodeTypes");
     return nodeTypesStore || null;
   } catch (error) {
     console.error('[n8nStore] Failed to get node types store:', error);
+    return null;
+  }
+}
+
+/**
+ * Get n8n's UI store
+ * @returns {Object|null} UI store or null
+ */
+export function getUIStore() {
+  try {
+    const app = document.getElementById("app")?.__vue_app__;
+    if (!app) return null;
+
+    const provides = app._context?.provides;
+    if (!provides) return null;
+
+    const symbols = Object.getOwnPropertySymbols(provides);
+    const pinia = symbols
+      .map(s => provides[s])
+      .find(p => p.state && p.state.value);
+
+    if (!pinia) return null;
+
+    const uiStore = pinia._s.get("ui");
+    return uiStore || null;
+  } catch (error) {
+    console.error('[n8nStore] Failed to get UI store:', error);
     return null;
   }
 }
@@ -246,7 +273,18 @@ export async function addNodeToWorkflow(nodeConfig, options = {}) {
     if (addedNode) {
       // Trigger reactivity to update UI
       workflowsStore.setNodes([...workflowsStore.workflow.nodes]);
-      
+
+      // Mark workflow as dirty
+      try {
+        const uiStore = getUIStore();
+        if (uiStore) {
+          // Set stateIsDirty to true to trigger the save button
+          uiStore.stateIsDirty = true;
+        }
+      } catch (error) {
+        console.warn('[n8nStore] Error marking workflow as dirty:', error);
+      }
+
       // Zoom to fit after a delay
       setTimeout(() => {
         const zoomButton = document.querySelector('[data-test-id="zoom-to-fit"]');
@@ -254,7 +292,7 @@ export async function addNodeToWorkflow(nodeConfig, options = {}) {
           zoomButton.click();
         }
       }, 500);
-      
+
       return addedNode;
     }
     
@@ -307,7 +345,18 @@ export function addConnection(
       ]
     };
     workflowsStore.addConnection(connection);
-    
+
+    // Mark workflow as dirty
+    try {
+      const uiStore = getUIStore();
+      if (uiStore) {
+        // Set stateIsDirty to true to trigger the save button
+        uiStore.stateIsDirty = true;
+      }
+    } catch (error) {
+      console.warn('[n8nStore] Error marking workflow as dirty:', error);
+    }
+
     return true;
   } catch (error) {
     console.error('[n8nStore] Failed to add connection:', error);
@@ -325,7 +374,7 @@ export function getCurrentWorkflow() {
     if (!store || !store.workflow) {
       return { error: 'Cannot access workflow data' };
     }
-    
+
     return {
       connections: JSON.parse(JSON.stringify(store.workflow.connections || {})),
       nodes: JSON.parse(JSON.stringify(store.workflow.nodes || []))
@@ -453,7 +502,7 @@ if (typeof window !== 'undefined') {
   // Listen for catalog extraction requests
   window.addEventListener('message', async (event) => {
     if (event.source !== window) return
-    
+
     if (event.data.type === 'nodeflip-extract-catalog') {
       try {
         // Import catalog extractor functions

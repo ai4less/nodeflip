@@ -1,0 +1,124 @@
+/**
+ * Custom Radio Styles
+ * Modern radio button group with proper centering
+ */
+
+.custom-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.custom-radio-option:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-radio-option.selected {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+/* Hide native radio input */
+.custom-radio-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Custom radio circle */
+.custom-radio-circle {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  border: 2px solid #666;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px; /* Align with text baseline */
+}
+
+.custom-radio-option:hover .custom-radio-circle {
+  border-color: #888;
+}
+
+.custom-radio-option.selected .custom-radio-circle {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+/* Radio dot - properly centered using flexbox */
+.custom-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s ease;
+  transform: scale(0);
+}
+
+.custom-radio-option.selected .custom-radio-dot {
+  background: #667eea;
+  transform: scale(1);
+}
+
+/* Radio label */
+.custom-radio-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+  user-select: none;
+  line-height: 1.5;
+}
+
+.custom-radio-option.selected .custom-radio-label {
+  color: #fff;
+}
+
+/* Radio description (optional) */
+.custom-radio-description {
+  display: block;
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.custom-radio-option.selected .custom-radio-description {
+  color: #ccc;
+}
+
+/* Compact layout variant */
+.custom-radio-group.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.custom-radio-group.compact .custom-radio-option {
+  flex: 0 1 auto;
+  padding: 8px 14px;
+}
+
+.custom-radio-group.compact .custom-radio-description {
+  display: none;
+}

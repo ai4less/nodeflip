@@ -7,6 +7,7 @@ import { logger } from '@src/utils/logger'
 import { render } from 'preact'
 import { CustomSelect } from './components/CustomSelect'
 import { CustomInput } from './components/CustomInput'
+import { CustomRadio } from './components/CustomRadio'
 
 /**
  * Generate Property Inspector form from schema
@@ -231,35 +232,40 @@ function createSelect(field) {
 }
 
 /**
- * Create radio button group
+ * Create radio button group (using Preact CustomRadio component)
  */
 function createRadioGroup(field) {
-  const container = document.createElement('div')
-  container.className = 'property-radio-group'
-
   if (!field.options || !Array.isArray(field.options)) {
     logger.warn(`[SchemaForm] Radio field missing options: ${field.name}`)
-    return container
+    return document.createElement('div')
   }
 
-  field.options.forEach((option, index) => {
-    const label = document.createElement('label')
-    label.className = 'property-radio'
+  // Create container for the Preact component
+  const container = document.createElement('div')
+  container.className = 'property-input-wrapper'
+  container.dataset.fieldName = field.name
 
-    const input = document.createElement('input')
-    input.type = 'radio'
-    input.name = field.name
-    input.value = option.value
-    input.checked = field.default === option.value
+  // Create hidden input to store the value
+  const hiddenInput = document.createElement('input')
+  hiddenInput.type = 'hidden'
+  hiddenInput.name = field.name
+  hiddenInput.value = field.default || (field.options[0]?.value || '')
+  container.appendChild(hiddenInput)
 
-    const span = document.createElement('span')
-    span.className = 'property-radio-label'
-    span.textContent = option.label || option.value
+  // Render Preact component
+  render(
+    <CustomRadio
+      field={field}
+      onChange={(e) => {
+        hiddenInput.value = e.target.value
 
-    label.appendChild(input)
-    label.appendChild(span)
-    container.appendChild(label)
-  })
+        // Dispatch change event for form sync
+        const event = new Event('change', { bubbles: true })
+        hiddenInput.dispatchEvent(event)
+      }}
+    />,
+    container
+  )
 
   return container
 }

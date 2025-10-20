@@ -735,8 +735,7 @@ export const AIBuilder = () => {
           parameters: {
             url: `${config.backendUrl}/api/v1/custom-nodes/${node.id}/execute`,
             method: 'POST',
-            authentication: 'genericCredentialType',
-            genericAuthType: 'httpHeaderAuth',
+            authentication: 'none',
             sendHeaders: true,
             headerParameters: {
               parameters: [

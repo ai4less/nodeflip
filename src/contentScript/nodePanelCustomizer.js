@@ -135,14 +135,13 @@ function injectAI4LessInterface(nodeSettings, customNode) {
   const banner = document.createElement('div')
   banner.dataset.ai4lessInterface = 'true'
   banner.style.cssText = `
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #323334;
     color: white;
     padding: 16px;
-    border-bottom: 2px solid #5568d3;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
     gap: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   `
 
   banner.innerHTML = `
