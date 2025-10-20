@@ -13,8 +13,35 @@ export function CustomSelect({ field, onChange }) {
   const [selectedValue, setSelectedValue] = useState(field.default || (field.options?.[0]?.value || ''))
   const containerRef = useRef(null)
   const searchInputRef = useRef(null)
+  const hiddenInputRef = useRef(null)
 
   const options = field.options || []
+
+  // Listen for external value changes (from loadExistingValues)
+  useEffect(() => {
+    if (!hiddenInputRef.current) return
+
+    const handleExternalChange = (e) => {
+      // Only update if the value is different
+      if (e.target.value !== selectedValue) {
+        console.log(`[CustomSelect] External value change detected for ${field.name}:`, e.target.value)
+        setSelectedValue(e.target.value)
+      }
+    }
+
+    const element = hiddenInputRef.current
+    element.addEventListener('change', handleExternalChange)
+
+    // Check if input already has a value on mount (from loadExistingValues)
+    if (element.value && element.value !== selectedValue) {
+      console.log(`[CustomSelect] Initial value detected for ${field.name}:`, element.value)
+      setSelectedValue(element.value)
+    }
+
+    return () => {
+      element.removeEventListener('change', handleExternalChange)
+    }
+  }, [field.name, selectedValue])
   
   // Filter options based on search query
   const filteredOptions = searchQuery
@@ -106,6 +133,14 @@ export function CustomSelect({ field, onChange }) {
       data-field={field.name}
       onKeyDown={handleKeyDown}
     >
+      {/* Hidden input for form synchronization */}
+      <input
+        ref={hiddenInputRef}
+        type="hidden"
+        name={field.name}
+        value={selectedValue}
+      />
+
       {/* Select trigger button */}
       <button
         type="button"

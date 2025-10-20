@@ -7,6 +7,8 @@ import { logger } from '@src/utils/logger'
 import { generatePropertyInspectorForm, extractFormData } from './schemaFormGenerator'
 import { getCachedCustomNodes } from './customNodeIcons'
 import { AIBuilderAPI } from './api'
+import { addExecuteButton } from './customNodeExecutor'
+import { showSaveReminder, markWorkflowAsModified } from './workflowSaver'
 import './styles/propertyInspector.css'
 
 let nodePanelObserver = null
@@ -247,6 +249,12 @@ function generateCleanInputForm(nodeSettings, customNode) {
     return
   }
 
+  // Check if form already exists (prevent double injection)
+  if (parameterList.querySelector('[data-ai4less-form]')) {
+    console.log('[nodeFlip] ⚠️ Form already exists, skipping generation')
+    return
+  }
+
   // Generate form from schema
   const formContainer = generatePropertyInspectorForm(customNode.input_schema)
   formContainer.style.cssText = `
@@ -255,6 +263,9 @@ function generateCleanInputForm(nodeSettings, customNode) {
 
   // Insert at the beginning of parameter list
   parameterList.insertBefore(formContainer, parameterList.firstChild)
+
+  // Add execute button
+  addExecuteButton(nodeSettings, customNode, formContainer)
 
   // Set up form synchronization with hidden JSON field
   setupFormSync(nodeSettings, formContainer)
@@ -277,22 +288,112 @@ function setupFormSync(nodeSettings, formContainer) {
   // Function to sync form to JSON
   const syncFormToJson = () => {
     const formData = extractFormData(formContainer)
-    const jsonValue = JSON.stringify({ input_data: formData })
+    const jsonValue = JSON.stringify(formData, null, 2)
 
-    // Update the CodeMirror editor
+    // Update the CodeMirror editor content
     jsonBodyInput.textContent = jsonValue
-    // Trigger change event
-    const event = new Event('input', { bubbles: true })
-    jsonBodyInput.dispatchEvent(event)
+
+    // Trigger input event to notify n8n
+    const inputEvent = new Event('input', { bubbles: true })
+    jsonBodyInput.dispatchEvent(inputEvent)
   }
 
-  // Listen for changes on all form inputs
+  // Track if values have been loaded to prevent re-loading
+  let valuesLoaded = false
+
+  // Listen for changes on all form inputs with debouncing
+  let syncTimeout
+  let saveReminderTimeout
+  const debouncedSync = () => {
+    clearTimeout(syncTimeout)
+    syncTimeout = setTimeout(() => {
+      syncFormToJson()
+
+      // Mark workflow as modified
+      markWorkflowAsModified()
+
+      // Show save reminder after 2 seconds of inactivity
+      clearTimeout(saveReminderTimeout)
+      saveReminderTimeout = setTimeout(() => {
+        showSaveReminder()
+      }, 2000)
+    }, 300)
+  }
+
   const inputs = formContainer.querySelectorAll('input, select, textarea')
   inputs.forEach((input) => {
-    input.addEventListener('input', syncFormToJson)
-    input.addEventListener('change', syncFormToJson)
+    input.addEventListener('input', debouncedSync)
+    input.addEventListener('change', syncFormToJson) // Immediate on change
+    input.addEventListener('blur', () => {
+      syncFormToJson()
+      markWorkflowAsModified()
+      // Show save reminder on blur
+      setTimeout(() => showSaveReminder(), 500)
+    })
   })
 
-  // Initial sync
-  syncFormToJson()
+  // Load existing values from n8n after Preact components have mounted
+  // Delay ensures components have time to set up their event listeners
+  if (!valuesLoaded) {
+    setTimeout(() => {
+      loadExistingValues(formContainer, jsonBodyInput)
+      valuesLoaded = true
+    }, 100)
+  }
+
+  // Initial sync only if no values were loaded
+  setTimeout(() => {
+    const existingJson = jsonBodyInput.textContent.trim()
+    if (!existingJson || existingJson === '{}') {
+      syncFormToJson()
+    }
+  }, 600)
+}
+
+/**
+ * Load existing values from n8n's JSON body into the form
+ */
+function loadExistingValues(formContainer, jsonBodyInput) {
+  try {
+    const existingJson = jsonBodyInput.textContent.trim()
+    if (!existingJson || existingJson === '{}') {
+      return
+    }
+
+    const existingData = JSON.parse(existingJson)
+    console.log('[nodeFlip] 📥 Loading existing values:', existingData)
+
+    // Populate form fields with existing values
+    Object.keys(existingData).forEach((fieldName) => {
+      const value = existingData[fieldName]
+
+      // Find input by name
+      const input = formContainer.querySelector(`[name="${fieldName}"]`)
+      if (!input) return
+
+      // Mark this input as having loaded data (to prevent clearing)
+      input.dataset.ai4lessInitialized = 'true'
+
+      if (input.type === 'checkbox') {
+        input.checked = Boolean(value)
+      } else if (input.type === 'radio') {
+        const radio = formContainer.querySelector(`[name="${fieldName}"][value="${value}"]`)
+        if (radio) {
+          radio.checked = true
+          radio.dataset.ai4lessInitialized = 'true'
+        }
+      } else {
+        // Set value directly for text inputs
+        input.value = value
+      }
+
+      // Trigger change event for Preact components to pick up
+      const changeEvent = new Event('change', { bubbles: true })
+      input.dispatchEvent(changeEvent)
+    })
+
+    console.log('[nodeFlip] ✓ Loaded existing values into form')
+  } catch (error) {
+    console.log('[nodeFlip] No existing values to load:', error)
+  }
 }

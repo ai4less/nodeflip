@@ -206,23 +206,18 @@ function createSelect(field) {
   container.className = 'property-input-wrapper'
   container.dataset.fieldName = field.name
 
-  // Create hidden input to store the value
-  const hiddenInput = document.createElement('input')
-  hiddenInput.type = 'hidden'
-  hiddenInput.name = field.name
-  hiddenInput.value = field.default || (field.options[0]?.value || '')
-  container.appendChild(hiddenInput)
-
-  // Render Preact component
+  // Render Preact component (it will create its own hidden input)
   render(
     <CustomSelect
       field={field}
       onChange={(e) => {
-        hiddenInput.value = e.target.value
-        
-        // Dispatch change event for form sync
-        const event = new Event('change', { bubbles: true })
-        hiddenInput.dispatchEvent(event)
+        // Update hidden input value and dispatch change event for form sync
+        const hiddenInput = container.querySelector(`input[name="${field.name}"]`)
+        if (hiddenInput) {
+          hiddenInput.value = e.target.value
+          const event = new Event('change', { bubbles: true })
+          hiddenInput.dispatchEvent(event)
+        }
       }}
     />,
     container
@@ -245,23 +240,18 @@ function createRadioGroup(field) {
   container.className = 'property-input-wrapper'
   container.dataset.fieldName = field.name
 
-  // Create hidden input to store the value
-  const hiddenInput = document.createElement('input')
-  hiddenInput.type = 'hidden'
-  hiddenInput.name = field.name
-  hiddenInput.value = field.default || (field.options[0]?.value || '')
-  container.appendChild(hiddenInput)
-
-  // Render Preact component
+  // Render Preact component (it will create its own hidden input)
   render(
     <CustomRadio
       field={field}
       onChange={(e) => {
-        hiddenInput.value = e.target.value
-
-        // Dispatch change event for form sync
-        const event = new Event('change', { bubbles: true })
-        hiddenInput.dispatchEvent(event)
+        // Update hidden input value and dispatch change event for form sync
+        const hiddenInput = container.querySelector(`input[name="${field.name}"]`)
+        if (hiddenInput) {
+          hiddenInput.value = e.target.value
+          const event = new Event('change', { bubbles: true })
+          hiddenInput.dispatchEvent(event)
+        }
       }}
     />,
     container
