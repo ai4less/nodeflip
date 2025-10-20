@@ -35,5 +35,5 @@ export default defineManifest({
       matches: ['http://*/*', 'https://*/*'],
     },
   ],
-  permissions: ['storage'],
+  permissions: ['storage']
 })

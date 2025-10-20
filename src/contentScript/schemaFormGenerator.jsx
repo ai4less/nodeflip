@@ -8,6 +8,7 @@ import { render } from 'preact'
 import { CustomSelect } from './components/CustomSelect'
 import { CustomInput } from './components/CustomInput'
 import { CustomRadio } from './components/CustomRadio'
+import { CodeMirrorEditor } from './components/CodeMirrorEditor'
 
 /**
  * Generate Property Inspector form from schema
@@ -102,6 +103,8 @@ function generateField(field) {
  */
 function createInput(field) {
   switch (field.type) {
+    case 'code':
+      return createCodeEditor(field)
     case 'string':
       return createTextInput(field)
     case 'number':
@@ -123,17 +126,78 @@ function createInput(field) {
 }
 
 /**
+ * Create Monaco code editor
+ */
+function createCodeEditor(field) {
+  const container = document.createElement('div')
+  container.className = 'property-input-wrapper'
+  container.dataset.fieldType = 'code'
+  container.dataset.fieldName = field.name
+
+  // Create a hidden input to store the code value for form sync
+  const hiddenInput = document.createElement('input')
+  hiddenInput.type = 'hidden'
+  hiddenInput.name = field.name
+  hiddenInput.value = field.default || ''
+  container.appendChild(hiddenInput)
+
+  // Render CodeMirror editor component
+  render(
+    <CodeMirrorEditor
+      field={field}
+      initialValue={field.default || ''}
+      language={field.language || 'python'}
+      height={field.height || '450px'}
+      onChange={(value) => {
+        console.log('[SchemaForm] onChange callback received! Value:', value?.substring(0, 50) + '...')
+        console.log('[SchemaForm] Hidden input exists?', !!hiddenInput)
+        console.log('[SchemaForm] Hidden input name:', hiddenInput?.name)
+
+        // Update hidden input value
+        hiddenInput.value = value || ''
+        console.log('[SchemaForm] Hidden input value set to:', hiddenInput.value?.substring(0, 50) + '...')
+
+        // Trigger both input and change events for form sync
+        const inputEvent = new Event('input', { bubbles: true })
+        hiddenInput.dispatchEvent(inputEvent)
+        console.log('[SchemaForm] Dispatched input event')
+
+        const changeEvent = new Event('change', { bubbles: true })
+        hiddenInput.dispatchEvent(changeEvent)
+        console.log('[SchemaForm] Dispatched change event')
+
+        logger.log('[SchemaForm] Code editor value changed:', value?.substring(0, 50) + '...')
+      }}
+    />,
+    container
+  )
+
+  // Store method to update editor value from outside
+  container._updateEditorValue = (newValue) => {
+    hiddenInput.value = newValue
+    // Dispatch custom event that the Monaco component will listen to
+    const event = new CustomEvent('ai4less-update-code', {
+      detail: { value: newValue },
+      bubbles: false
+    })
+    container.dispatchEvent(event)
+  }
+
+  return container
+}
+
+/**
  * Create text input (using Preact CustomInput component)
  */
 function createTextInput(field) {
   const container = document.createElement('div')
   container.className = 'property-input-wrapper'
-  
+
   render(
     <CustomInput field={field} type="text" />,
     container
   )
-  
+
   return container
 }
 

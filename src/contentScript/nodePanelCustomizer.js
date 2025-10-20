@@ -163,6 +163,9 @@ function injectAI4LessInterface(nodeSettings, customNode) {
   // Replace header icon
   replaceHeaderIcon(nodeSettings)
 
+  // Make panel wider for code editor
+  makeNodePanelWider(nodeSettings)
+
   // Generate clean input form FIRST
   generateCleanInputForm(nodeSettings, customNode)
 
@@ -178,12 +181,95 @@ function injectAI4LessInterface(nodeSettings, customNode) {
 function replaceHeaderIcon(nodeSettings) {
   // Find the header icon img
   const headerIcon = nodeSettings.querySelector('img[src*="httprequest"]')
-  
+
   if (headerIcon) {
     headerIcon.src = 'https://seleniumbase.io/img/logo3c.png'
   } else {
     console.log('[nodeFlip] ⚠️ Could not find header icon')
   }
+}
+
+/**
+ * Add expand/collapse toggle button for n8n main panel
+ */
+function addPanelExpandToggle(nodeSettings) {
+  // Find the main panel with n8n class that constrains width
+  const mainPanel = document.querySelector('[class*="_mainPanel_"]')
+
+  if (!mainPanel) {
+    console.log('[nodeFlip] ⚠️ Could not find main panel')
+    return
+  }
+
+  // Check if toggle already exists
+  if (document.querySelector('.ai4less-panel-expand-toggle')) {
+    return
+  }
+
+  // Check if panel has code editor
+  setTimeout(() => {
+    const hasCodeEditor = nodeSettings.querySelector('.property-monaco-editor-container')
+    if (!hasCodeEditor) {
+      return
+    }
+
+    // Create toggle button
+    const toggleButton = document.createElement('button')
+    toggleButton.className = 'ai4less-panel-expand-toggle'
+    toggleButton.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1 3h14v2H1V3zm0 4h14v2H1V7zm0 4h14v2H1v-2z"/>
+      </svg>
+      <span class="expand-text">Expand Panel</span>
+      <span class="collapse-text" style="display:none;">Collapse Panel</span>
+    `
+
+    // Store original left/right values
+    const originalStyles = {
+      left: getComputedStyle(mainPanel).left,
+      right: getComputedStyle(mainPanel).right
+    }
+
+    let isExpanded = false
+
+    toggleButton.addEventListener('click', () => {
+      isExpanded = !isExpanded
+
+      if (isExpanded) {
+        // Expand to full width
+        mainPanel.style.left = '60px'  // Keep minimal left sidebar
+        mainPanel.style.right = '60px' // Keep minimal right sidebar
+        toggleButton.classList.add('expanded')
+        toggleButton.querySelector('.expand-text').style.display = 'none'
+        toggleButton.querySelector('.collapse-text').style.display = 'inline'
+        console.log('[nodeFlip] 📐 Panel expanded to full width')
+      } else {
+        // Collapse to original width
+        mainPanel.style.left = originalStyles.left
+        mainPanel.style.right = originalStyles.right
+        toggleButton.classList.remove('expanded')
+        toggleButton.querySelector('.expand-text').style.display = 'inline'
+        toggleButton.querySelector('.collapse-text').style.display = 'none'
+        console.log('[nodeFlip] 📐 Panel collapsed to default width')
+      }
+    })
+
+    // Insert button at top of node settings panel
+    const nodeSettingsHeader = nodeSettings.querySelector('[class*="_header_"]') || nodeSettings
+    nodeSettingsHeader.style.position = 'relative'
+    nodeSettingsHeader.insertBefore(toggleButton, nodeSettingsHeader.firstChild)
+
+    console.log('[nodeFlip] ✓ Added panel expand toggle button')
+  }, 500) // Wait for form to be generated
+}
+
+/**
+ * Make node settings panel wider for code editor
+ * @deprecated - Now using addPanelExpandToggle instead
+ */
+function makeNodePanelWider(nodeSettings) {
+  // Replaced by addPanelExpandToggle
+  addPanelExpandToggle(nodeSettings)
 }
 
 /**
@@ -193,7 +279,8 @@ function hideHttpTechnicalFields(nodeSettings) {
   const fieldsToHide = [
     'method', 'url', 'authentication', 'genericAuthType',
     'sendQuery', 'sendHeaders', 'specifyHeaders', 'headerParameters',
-    'sendBody', 'contentType', 'specifyBody', 'jsonBody',
+    'sendBody', 'contentType', 'specifyBody',
+    // NOTE: We keep jsonBody visible because we need to sync our form data to it
     'options', 'timeout'
   ]
 
@@ -255,8 +342,21 @@ function generateCleanInputForm(nodeSettings, customNode) {
     return
   }
 
-  // Generate form from schema
-  const formContainer = generatePropertyInspectorForm(customNode.input_schema)
+  // Read existing saved values from n8n BEFORE generating form
+  const savedValues = readSavedValuesFromN8n(nodeSettings)
+  console.log('[nodeFlip] Saved values from n8n:', savedValues)
+
+  // Merge saved values with schema defaults
+  const schemaWithValues = {
+    ...customNode.input_schema,
+    fields: customNode.input_schema.fields.map(field => ({
+      ...field,
+      default: savedValues[field.name] !== undefined ? savedValues[field.name] : field.default
+    }))
+  }
+
+  // Generate form from schema with saved values
+  const formContainer = generatePropertyInspectorForm(schemaWithValues)
   formContainer.style.cssText = `
     padding-block: 16px;
   `
@@ -264,136 +364,134 @@ function generateCleanInputForm(nodeSettings, customNode) {
   // Insert at the beginning of parameter list
   parameterList.insertBefore(formContainer, parameterList.firstChild)
 
-  // Add execute button
-  addExecuteButton(nodeSettings, customNode, formContainer)
-
   // Set up form synchronization with hidden JSON field
   setupFormSync(nodeSettings, formContainer)
+}
+
+/**
+ * Read saved values from n8n's jsonBody field
+ */
+function readSavedValuesFromN8n(nodeSettings) {
+  const jsonBodyContainer = nodeSettings.querySelector('[data-test-id="parameter-input-jsonBody"]')
+  if (!jsonBodyContainer) return {}
+
+  try {
+    const lines = jsonBodyContainer.querySelectorAll('.cm-line')
+    const jsonText = Array.from(lines).map(line => line.textContent).join('\n')
+
+    if (!jsonText || jsonText === '{}') return {}
+
+    const existingData = JSON.parse(jsonText)
+
+    // Return merged fields from config and code
+    return {
+      ...(existingData.config || {}),
+      ...(existingData.code ? { code: existingData.code } : {})
+    }
+  } catch (error) {
+    console.log('[nodeFlip] No saved values to read:', error)
+    return {}
+  }
 }
 
 /**
  * Set up form synchronization with hidden JSON body field
  */
 function setupFormSync(nodeSettings, formContainer) {
-  // Find the JSON body code editor
-  const jsonBodyInput = nodeSettings.querySelector(
-    '[data-test-id="parameter-input-jsonBody"] .cm-content',
-  )
+  console.log('[nodeFlip] 🔧 setupFormSync called')
 
-  if (!jsonBodyInput) {
-    console.log('[nodeFlip] ⚠️ Could not find JSON body input for syncing')
+  // Find n8n's jsonBody CodeMirror container
+  const jsonBodyContainer = nodeSettings.querySelector('[data-test-id="parameter-input-jsonBody"]')
+
+  if (!jsonBodyContainer) {
+    console.log('[nodeFlip] ⚠️ Could not find JSON body container')
     return
   }
 
-  // Function to sync form to JSON
-  const syncFormToJson = () => {
-    const formData = extractFormData(formContainer)
-    const jsonValue = JSON.stringify(formData, null, 2)
+  console.log('[nodeFlip] ✓ Found jsonBody container')
 
-    // Update the CodeMirror editor content
-    jsonBodyInput.textContent = jsonValue
+  // Simple n8n jsonBody accessor
+  const n8nJsonBody = {
+    // Read value from n8n's CodeMirror
+    get: () => {
+      const lines = jsonBodyContainer.querySelectorAll('.cm-line')
+      return Array.from(lines).map(line => line.textContent).join('\n')
+    },
 
-    // Trigger input event to notify n8n
-    const inputEvent = new Event('input', { bubbles: true })
-    jsonBodyInput.dispatchEvent(inputEvent)
+    // Write value to n8n's CodeMirror (completely silent - no events)
+    // n8n will read this value when the user saves the workflow
+    set: (value) => {
+      const cmContent = jsonBodyContainer.querySelector('.cm-content')
+      if (!cmContent) return
+
+      // Silently update the DOM - no events to avoid external change detection
+      cmContent.textContent = value
+      console.log('[nodeFlip] Silently updated jsonBody')
+    }
   }
 
-  // Track if values have been loaded to prevent re-loading
-  let valuesLoaded = false
+  // Sync form data to n8n's jsonBody
+  const syncFormToJson = () => {
+    console.log('[nodeFlip] 🔄 syncFormToJson called')
+    const formData = extractFormData(formContainer)
 
-  // Listen for changes on all form inputs with debouncing
-  let syncTimeout
-  let saveReminderTimeout
+    // Build payload structure
+    const payload = formData.code !== undefined
+      ? {
+          // SANDBOX NODE: Structure for Beam sandbox execution
+          code: formData.code,
+          input_data: '={{ $json }}',
+          config: Object.fromEntries(
+            Object.entries(formData).filter(([key]) => key !== 'code')
+          )
+        }
+      : {
+          // ENDPOINT NODE: Simple structure for endpoint proxying
+          input_data: {
+            ...formData,
+            workflow_data: '={{ $json }}'
+          }
+        }
+
+    // Write to n8n
+    n8nJsonBody.set(JSON.stringify(payload, null, 2))
+    console.log('[nodeFlip] ✓ Synced to n8n:', payload)
+  }
+
+
+  // Debounced sync with save reminder
+  let syncTimeout, saveReminderTimeout
   const debouncedSync = () => {
     clearTimeout(syncTimeout)
     syncTimeout = setTimeout(() => {
       syncFormToJson()
-
-      // Mark workflow as modified
-      markWorkflowAsModified()
-
-      // Show save reminder after 2 seconds of inactivity
       clearTimeout(saveReminderTimeout)
-      saveReminderTimeout = setTimeout(() => {
-        showSaveReminder()
-      }, 2000)
+      saveReminderTimeout = setTimeout(() => showSaveReminder(), 2000)
     }, 300)
   }
 
-  const inputs = formContainer.querySelectorAll('input, select, textarea')
-  inputs.forEach((input) => {
-    input.addEventListener('input', debouncedSync)
-    input.addEventListener('change', syncFormToJson) // Immediate on change
-    input.addEventListener('blur', () => {
-      syncFormToJson()
-      markWorkflowAsModified()
-      // Show save reminder on blur
-      setTimeout(() => showSaveReminder(), 500)
-    })
-  })
-
-  // Load existing values from n8n after Preact components have mounted
-  // Delay ensures components have time to set up their event listeners
-  if (!valuesLoaded) {
-    setTimeout(() => {
-      loadExistingValues(formContainer, jsonBodyInput)
-      valuesLoaded = true
-    }, 100)
-  }
-
-  // Initial sync only if no values were loaded
+  // Attach event listeners to form inputs (after Preact components render)
   setTimeout(() => {
-    const existingJson = jsonBodyInput.textContent.trim()
-    if (!existingJson || existingJson === '{}') {
+    const inputs = formContainer.querySelectorAll('input, select, textarea')
+    console.log('[nodeFlip] Attaching listeners to', inputs.length, 'inputs')
+
+    inputs.forEach((input) => {
+      input.addEventListener('input', debouncedSync)
+      input.addEventListener('change', syncFormToJson)
+      input.addEventListener('blur', () => {
+        syncFormToJson()
+        setTimeout(() => showSaveReminder(), 500)
+      })
+    })
+  }, 100)
+
+  // Initial sync if no existing data
+  setTimeout(() => {
+    const existing = n8nJsonBody.get()
+    if (!existing || existing === '{}') {
+      console.log('[nodeFlip] Performing initial sync')
       syncFormToJson()
     }
-  }, 600)
+  }, 300)
 }
 
-/**
- * Load existing values from n8n's JSON body into the form
- */
-function loadExistingValues(formContainer, jsonBodyInput) {
-  try {
-    const existingJson = jsonBodyInput.textContent.trim()
-    if (!existingJson || existingJson === '{}') {
-      return
-    }
-
-    const existingData = JSON.parse(existingJson)
-    console.log('[nodeFlip] 📥 Loading existing values:', existingData)
-
-    // Populate form fields with existing values
-    Object.keys(existingData).forEach((fieldName) => {
-      const value = existingData[fieldName]
-
-      // Find input by name
-      const input = formContainer.querySelector(`[name="${fieldName}"]`)
-      if (!input) return
-
-      // Mark this input as having loaded data (to prevent clearing)
-      input.dataset.ai4lessInitialized = 'true'
-
-      if (input.type === 'checkbox') {
-        input.checked = Boolean(value)
-      } else if (input.type === 'radio') {
-        const radio = formContainer.querySelector(`[name="${fieldName}"][value="${value}"]`)
-        if (radio) {
-          radio.checked = true
-          radio.dataset.ai4lessInitialized = 'true'
-        }
-      } else {
-        // Set value directly for text inputs
-        input.value = value
-      }
-
-      // Trigger change event for Preact components to pick up
-      const changeEvent = new Event('change', { bubbles: true })
-      input.dispatchEvent(changeEvent)
-    })
-
-    console.log('[nodeFlip] ✓ Loaded existing values into form')
-  } catch (error) {
-    console.log('[nodeFlip] No existing values to load:', error)
-  }
-}

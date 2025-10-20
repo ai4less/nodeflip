@@ -728,12 +728,38 @@ export const AIBuilder = () => {
 
         const config = await apiRef.current.getConfig()
 
+        // Determine execution URL based on node type
+        const isSandboxExecution = node.execution_type === 'sandbox'
+        const executionUrl = isSandboxExecution
+          ? `${config.backendUrl}/api/v1/custom-nodes/execute-code`
+          : `${config.backendUrl}/api/v1/custom-nodes/${node.id}/execute`
+
+        console.log(`[nodeFlip] Creating node with execution_type: ${node.execution_type}, URL: ${executionUrl}`)
+
+        // Determine initial JSON body based on execution type
+        let initialJsonBody
+        if (isSandboxExecution) {
+          // Sandbox nodes: code + input_data + config structure
+          initialJsonBody = {
+            code: '# Your code here\nprint(input_data)',
+            input_data: '={{ $json }}',
+            config: {}
+          }
+        } else {
+          // Endpoint nodes: input_data with workflow_data
+          initialJsonBody = {
+            input_data: {
+              workflow_data: '={{ $json }}'
+            }
+          }
+        }
+
         // Create HTTP node configuration
         const nodeConfig = {
           type: 'n8n-nodes-base.httpRequest',
           name: node.name,
           parameters: {
-            url: `${config.backendUrl}/api/v1/custom-nodes/${node.id}/execute`,
+            url: executionUrl,
             method: 'POST',
             authentication: 'none',
             sendHeaders: true,
@@ -747,7 +773,7 @@ export const AIBuilder = () => {
             },
             sendBody: true,
             specifyBody: 'json',
-            jsonBody: JSON.stringify({ input_data: '={{ $json }}' }),
+            jsonBody: JSON.stringify(initialJsonBody),
             options: {
               timeout: 30000,
             },
